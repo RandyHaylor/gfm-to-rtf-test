@@ -200,6 +200,72 @@ def _handle_escaped_char(match):
     """Replace \\* with placeholder so it doesn't match bold/italic later."""
     return _ESCAPE_PLACEHOLDER + match.group(1)
 
+# ---------------------------------------------------------------------------
+# DOCX-SPECIFIC HANDLERS
+# ---------------------------------------------------------------------------
+# DOCX hyperlinks need relationship IDs. We collect them during inline processing
+# and resolve them when assembling the final document.xml.rels.
+_DOCX_HYPERLINK_COUNTER = 0
+_DOCX_HYPERLINKS = {}  # {rId: url}
+
+def _docx_register_hyperlink(url):
+    """Register a hyperlink URL and return its relationship ID."""
+    global _DOCX_HYPERLINK_COUNTER
+    _DOCX_HYPERLINK_COUNTER += 1
+    rid = f'rIdLink{_DOCX_HYPERLINK_COUNTER}'
+    _DOCX_HYPERLINKS[rid] = url
+    return rid
+
+def _docx_handle_md_link(match):
+    """Convert [text](url) to DOCX hyperlink XML."""
+    text = match.group(1)
+    url = match.group(2)
+    if url.startswith('#'):
+        bookmark = url[1:]
+        return f'<w:hyperlink w:anchor="{bookmark}"><w:r><w:rPr><w:color w:val="365F91"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">{text}</w:t></w:r></w:hyperlink>'
+    rid = _docx_register_hyperlink(url)
+    return f'<w:hyperlink r:id="{rid}"><w:r><w:rPr><w:color w:val="365F91"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">{text}</w:t></w:r></w:hyperlink>'
+
+def _docx_handle_bare_url(match):
+    """Convert bare URL to DOCX hyperlink XML."""
+    url = match.group(0)
+    rid = _docx_register_hyperlink(url)
+    return f'<w:hyperlink r:id="{rid}"><w:r><w:rPr><w:color w:val="365F91"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">{url}</w:t></w:r></w:hyperlink>'
+
+def _docx_handle_mention(match):
+    """Convert @username to DOCX hyperlink to GitHub profile."""
+    username = match.group(1)
+    url = f'https://github.com/{username}'
+    rid = _docx_register_hyperlink(url)
+    return f'<w:hyperlink r:id="{rid}"><w:r><w:rPr><w:color w:val="365F91"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">@{username}</w:t></w:r></w:hyperlink>'
+
+def _docx_handle_issue_ref(match):
+    """Convert #42 to DOCX hyperlink if repo context available."""
+    number = match.group(1)
+    repo = _detect_github_repo()
+    if repo:
+        url = f'https://github.com/{repo}/issues/{number}'
+        rid = _docx_register_hyperlink(url)
+        return f'<w:hyperlink r:id="{rid}"><w:r><w:rPr><w:color w:val="365F91"/><w:u w:val="single"/></w:rPr><w:t xml:space="preserve">#{number}</w:t></w:r></w:hyperlink>'
+    return f'<w:r><w:rPr><w:color w:val="365F91"/></w:rPr><w:t>#{number}</w:t></w:r>'
+
+def _docx_handle_html_img(match):
+    """Convert <img> tag to DOCX image placeholder text."""
+    tag = match.group(0)
+    alt_match = re.search(r'alt="([^"]*)"', tag)
+    src_match = re.search(r'src="([^"]*)"', tag)
+    alt_text = alt_match.group(1) if alt_match else 'image'
+    src_text = src_match.group(1) if src_match else ''
+    return f'<w:r><w:rPr><w:color w:val="666666"/></w:rPr><w:t>[Image: {alt_text} — {src_text}]</w:t></w:r>'
+
+def _docx_handle_emoji(match):
+    """Convert :shortcode: to emoji character for DOCX."""
+    shortcode = match.group(0)
+    emoji_char = EMOJI_MAP.get(shortcode)
+    if emoji_char:
+        return f'<w:r><w:t>{emoji_char}</w:t></w:r>'
+    return shortcode
+
 def _stash_inline_code(content):
     """Stash inline code content behind a placeholder so later rules can't touch it."""
     key = f'{_INLINE_CODE_PREFIX}{len(_INLINE_CODE_STASH)}'
@@ -258,9 +324,9 @@ INLINE_RULES = [
     # --- Phase 1: Strip/transform HTML and structural elements ---
     # These are format-neutral (same for all outputs)
     ('html_comment',    (r'<!--.*?-->',                         {'rtf': '', 'docx': '', 'pdf': ''}, re.DOTALL)),
-    ('html_picture',    (r'<picture>.*?<img\s+([^>]*)>.*?</picture>', {'rtf': r'<img \1>'}, re.DOTALL)),
-    ('html_source',     (r'<source[^>]*>',                      {'rtf': ''})),
-    ('html_img',        (r'<img\s+[^>]*>',                      {'rtf': _handle_html_img})),
+    ('html_picture',    (r'<picture>.*?<img\s+([^>]*)>.*?</picture>', {'rtf': r'<img \1>', 'docx': r'<img \1>'}, re.DOTALL)),
+    ('html_source',     (r'<source[^>]*>',                      {'rtf': '', 'docx': ''})),
+    ('html_img',        (r'<img\s+[^>]*>',                      {'rtf': _handle_html_img, 'docx': _docx_handle_html_img})),
     ('html_sub',        (r'<sub>(.*?)</sub>',                    {'rtf': r'{\\sub \1}',
                                                                     'docx': r'<w:r><w:rPr><w:vertAlign w:val="subscript"/></w:rPr><w:t>\1</w:t></w:r>'})),
     ('html_sup',        (r'<sup>(.*?)</sup>',                    {'rtf': r'{\\super \1}',
@@ -271,21 +337,24 @@ INLINE_RULES = [
                                                                     'docx': r'<w:r><w:br/></w:r>'})),
 
     # --- Phase 2: Escaped chars -> placeholders (before any markdown matching) ---
-    ('escaped_char',    (r'\\([*#_~`\[\]\\])',                   {'rtf': _handle_escaped_char})),
+    ('escaped_char',    (r'\\([*#_~`\[\]\\])',                   {'rtf': _handle_escaped_char, 'docx': _handle_escaped_char})),
 
     # --- Phase 3: Images and links (before inline code, which uses backticks) ---
-    ('md_image',        (r'!\[([^\]]*)\]\(([^)]+)\)',            {'rtf': r'{\\cf3 [Image: \1 \\u8212? \2]}'})),
-    ('md_link',         (r'\[([^\]]+)\]\(([^)]+)\)',             {'rtf': _handle_md_link})),
-    ('bare_url',        (r'(?<!["\(])https?://[^\s<>\)]+',       {'rtf': _handle_bare_url})),
+    ('md_image',        (r'!\[([^\]]*)\]\(([^)]+)\)',            {'rtf': r'{\\cf3 [Image: \1 \\u8212? \2]}',
+                                                                    'docx': r'<w:r><w:rPr><w:color w:val="666666"/></w:rPr><w:t>[Image: \1 — \2]</w:t></w:r>'})),
+    ('md_link',         (r'\[([^\]]+)\]\(([^)]+)\)',             {'rtf': _handle_md_link, 'docx': _docx_handle_md_link})),
+    ('bare_url',        (r'(?<!["\(])https?://[^\s<>\)]+',       {'rtf': _handle_bare_url, 'docx': _docx_handle_bare_url})),
 
     # --- Phase 4: Inline code (stash content to protect from emoji/mention rules) ---
-    ('inline_code',     (r'`([^`]+)`',                           {'rtf': lambda m: _stash_inline_code(m.group(1))})),
+    ('inline_code',     (r'`([^`]+)`',                           {'rtf': lambda m: _stash_inline_code(m.group(1)),
+                                                                    'docx': lambda m: f'<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="20"/><w:shd w:val="clear" w:fill="E6F0FA"/></w:rPr><w:t xml:space="preserve">{m.group(1)}</w:t></w:r>'})),
 
     # --- Phase 5: GitHub-specific inline elements ---
-    ('mention',         (r'@(\w[\w/-]*)',                         {'rtf': _handle_mention})),
-    ('issue_ref',       (r'(?<![&A-Fa-f0-9])#(\d+)\b',          {'rtf': _handle_issue_ref})),
-    ('footnote_ref',    (r'\[\^([^\]]+)\]',                      {'rtf': lambda m: f'{{\\super {{\\field{{{_RTF_STAR_PLACEHOLDER}\\fldinst HYPERLINK \\\\l "fn-{m.group(1)}"}}{{\\fldrslt \\cf2  [{m.group(1)}] }}}}}}'})),
-    ('emoji',           (r':\w+:',                                {'rtf': _handle_emoji})),
+    ('mention',         (r'@(\w[\w/-]*)',                         {'rtf': _handle_mention, 'docx': _docx_handle_mention})),
+    ('issue_ref',       (r'(?<![&A-Fa-f0-9])#(\d+)\b',          {'rtf': _handle_issue_ref, 'docx': _docx_handle_issue_ref})),
+    ('footnote_ref',    (r'\[\^([^\]]+)\]',                      {'rtf': lambda m: f'{{\\super {{\\field{{{_RTF_STAR_PLACEHOLDER}\\fldinst HYPERLINK \\\\l "fn-{m.group(1)}"}}{{\\fldrslt \\cf2  [{m.group(1)}] }}}}}}',
+                                                                    'docx': lambda m: f'<w:hyperlink w:anchor="fn-{m.group(1)}"><w:r><w:rPr><w:vertAlign w:val="superscript"/><w:color w:val="365F91"/></w:rPr><w:t>[{m.group(1)}]</w:t></w:r></w:hyperlink>'})),
+    ('emoji',           (r':\w+:',                                {'rtf': _handle_emoji, 'docx': _docx_handle_emoji})),
 
     # --- Phase 6: Text formatting ---
     ('bold_italic',     (r'\*\*\*(.+?)\*\*\*',                   {'rtf': r'{\\b\\i \1}',
