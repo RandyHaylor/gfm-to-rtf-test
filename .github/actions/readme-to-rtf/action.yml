@@ -14,7 +14,7 @@ runs:
       shell: bash
       run: pip install pygments pillow
 
-    - name: Run conversion pipeline
+    - name: Generate RTF files
       shell: python
       env:
         CONFIG_PATH: ${{ inputs.config }}
@@ -28,39 +28,54 @@ runs:
         config_path = os.environ['CONFIG_PATH']
         action_path = os.environ['ACTION_PATH']
 
-        with open(config_path) as f:
-            config = json.load(f)
-
         converter_script = os.path.join(action_path, 'gfm_markdown_to_rtf.py')
         embedder_script = os.path.join(action_path, 'rtf_image_embedder.py')
 
-        generated_files = []
+        with open(config_path) as f:
+            config = json.load(f)
 
         for entry in config.get('files', []):
             input_file = entry['input']
-            formats = entry.get('output_formats', ['rtf'])
             base_name = input_file.rsplit('.', 1)[0]
-
-            # Always generate RTF first (it's our source format)
             rtf_path = base_name + '.rtf'
             print(f'Converting {input_file} -> {rtf_path}')
             subprocess.run([sys.executable, converter_script, input_file, rtf_path], check=True)
             subprocess.run([sys.executable, embedder_script, rtf_path], check=True)
 
-            if 'rtf' in formats:
-                generated_files.append(rtf_path)
+    - name: Build dotnet converter
+      shell: bash
+      run: dotnet build ${{ github.action_path }}/rtf-converter/rtf-converter.csproj -c Release -o ${{ github.action_path }}/rtf-converter/bin
 
-            # DOCX and PDF need aspose-words (handled in separate Windows job)
-            # Store what's needed for the next job
-            needs_aspose = [f for f in formats if f in ('docx', 'pdf')]
-            if needs_aspose:
-                manifest = {'rtf': rtf_path, 'formats': needs_aspose, 'base_name': base_name}
-                manifest_path = base_name + '.convert-manifest.json'
-                with open(manifest_path, 'w') as mf:
-                    json.dump(manifest, mf)
-                generated_files.append(manifest_path)
+    - name: Generate DOCX and PDF files
+      shell: python
+      env:
+        CONFIG_PATH: ${{ inputs.config }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        import json
+        import os
+        import subprocess
 
-        # Write list of generated files for downstream steps
-        with open('generated-files.txt', 'w') as f:
-            f.write('\n'.join(generated_files))
-        print(f'Generated: {generated_files}')
+        config_path = os.environ['CONFIG_PATH']
+        action_path = os.environ['ACTION_PATH']
+        converter_exe = os.path.join(action_path, 'rtf-converter', 'bin', 'rtf-converter')
+
+        with open(config_path) as f:
+            config = json.load(f)
+
+        for entry in config.get('files', []):
+            input_file = entry['input']
+            formats = entry.get('output_formats', ['rtf'])
+            base_name = input_file.rsplit('.', 1)[0]
+            rtf_path = base_name + '.rtf'
+
+            extra_outputs = []
+            if 'docx' in formats:
+                extra_outputs.append(base_name + '.docx')
+            if 'pdf' in formats:
+                extra_outputs.append(base_name + '.pdf')
+
+            if extra_outputs:
+                cmd = [converter_exe, rtf_path] + extra_outputs
+                print(f'Converting: {" ".join(cmd)}')
+                subprocess.run(cmd, check=True)
