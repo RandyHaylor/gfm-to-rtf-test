@@ -99,6 +99,8 @@ SYNTAX_COLOR_MAP = {
 # Placeholder for escaped markdown chars — must not collide with real text
 _ESCAPE_PLACEHOLDER = '\x00ESC:'
 _RTF_STAR_PLACEHOLDER = '\x00RTFSTAR'  # Protects \* in RTF fields from italic regex
+_INLINE_CODE_STASH = {}  # Stash inline code content to protect from further rules
+_INLINE_CODE_PREFIX = '\x00CODE:'
 
 def rtf_escape(text):
     """Escape special RTF characters and handle unicode."""
@@ -112,6 +114,16 @@ def rtf_escape(text):
             result.append('\\}')
         elif char == '\t':
             result.append('\\tab ')
+        elif ord(char) > 0xFFFF:
+            # Surrogate pair for codepoints above U+FFFF
+            cp = ord(char) - 0x10000
+            high = 0xD800 + (cp >> 10)
+            low = 0xDC00 + (cp & 0x3FF)
+            # RTF \u uses signed 16-bit
+            import struct
+            high_signed = struct.unpack('h', struct.pack('H', high))[0]
+            low_signed = struct.unpack('h', struct.pack('H', low))[0]
+            result.append(f'\\u{high_signed}?\\u{low_signed}?')
         elif ord(char) > 127:
             result.append(f'\\u{ord(char)}?')
         else:
@@ -188,6 +200,12 @@ def _handle_escaped_char(match):
     """Replace \\* with placeholder so it doesn't match bold/italic later."""
     return _ESCAPE_PLACEHOLDER + match.group(1)
 
+def _stash_inline_code(content):
+    """Stash inline code content behind a placeholder so later rules can't touch it."""
+    key = f'{_INLINE_CODE_PREFIX}{len(_INLINE_CODE_STASH)}'
+    _INLINE_CODE_STASH[key] = content
+    return key
+
 # ---------------------------------------------------------------------------
 # GITHUB REPO CONTEXT (for resolving @mentions and #issues to URLs)
 # ---------------------------------------------------------------------------
@@ -252,14 +270,14 @@ INLINE_RULES = [
     ('md_link',         (r'\[([^\]]+)\]\(([^)]+)\)',             _handle_md_link)),
     ('bare_url',        (r'(?<!["\(])https?://[^\s<>\)]+',       _handle_bare_url)),
 
-    # --- Phase 4: GitHub-specific inline elements ---
+    # --- Phase 4: Inline code (stash content to protect from emoji/mention rules) ---
+    ('inline_code',     (r'`([^`]+)`',                           lambda m: _stash_inline_code(m.group(1)))),
+
+    # --- Phase 5: GitHub-specific inline elements ---
     ('mention',         (r'@(\w[\w/-]*)',                         _handle_mention)),
     ('issue_ref',       (r'(?<![&A-Fa-f0-9])#(\d+)\b',          _handle_issue_ref)),
     ('footnote_ref',    (r'\[\^([^\]]+)\]',                      lambda m: f'{{\\super {{\\field{{{_RTF_STAR_PLACEHOLDER}\\fldinst HYPERLINK \\\\l "fn-{m.group(1)}"}}{{\\fldrslt \\cf2  [{m.group(1)}] }}}}}}')),
     ('emoji',           (r':\w+:',                                _handle_emoji)),
-
-    # --- Phase 5: Inline code (before bold/italic to protect backtick content) ---
-    ('inline_code',     (r'`([^`]+)`',                           r'{\\f1\\fs20\\chshdng1\\chcbpat8 \1}')),
 
     # --- Phase 6: Text formatting ---
     ('bold_italic',     (r'\*\*\*(.+?)\*\*\*',                   r'{\\b\\i \1}')),
@@ -295,6 +313,11 @@ def apply_inline_rules(text):
     # Final phase: restore placeholders
     text = text.replace(_ESCAPE_PLACEHOLDER, '')
     text = text.replace(_RTF_STAR_PLACEHOLDER, '\\*')
+
+    # Restore stashed inline code
+    for key, content in _INLINE_CODE_STASH.items():
+        text = text.replace(key, f'{{\\f1\\fs20\\chshdng1\\chcbpat8 {content}}}')
+    _INLINE_CODE_STASH.clear()
 
     return text
 

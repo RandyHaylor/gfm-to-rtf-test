@@ -189,7 +189,7 @@ Here is a sentence with a footnote reference[^1]. And another[^longnote].
 
 ## Emoji
 
-Emoji shortcodes: ``:rocket:`` :rocket:, ``:tada:`` :tada:, ``:warning:`` :warning:
+Emoji shortcodes: `:rocket:` :rocket:, `:tada:` :tada:, `:warning:` :warning:
 
 ## Color Codes
 
