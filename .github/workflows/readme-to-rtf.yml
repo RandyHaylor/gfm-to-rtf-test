@@ -1,0 +1,38 @@
+name: Convert README to RTF
+
+on:
+  push:
+    paths:
+      - 'README.md'
+      - '.github/actions/readme-to-rtf/**'
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Convert README to RTF
+        uses: ./.github/actions/readme-to-rtf
+
+      - name: Configure git
+        shell: bash
+        run: git config user.name "github-actions[bot]"
+
+      - name: Configure git email
+        shell: bash
+        run: git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Stage RTF
+        shell: bash
+        run: git add README.rtf
+
+      - name: Commit if changed
+        shell: bash
+        run: git diff --cached --quiet || git commit -m "auto: regenerate README.rtf from README.md"
+
+      - name: Push
+        shell: bash
+        run: git push

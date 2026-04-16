@@ -1,0 +1,27 @@
+name: 'README to RTF'
+description: 'Convert GitHub-flavored Markdown README to RTF with embedded images'
+
+inputs:
+  input:
+    description: 'Path to input markdown file'
+    required: false
+    default: 'README.md'
+  output:
+    description: 'Path to output RTF file'
+    required: false
+    default: 'README.rtf'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Python dependencies
+      shell: bash
+      run: pip install pygments pillow
+
+    - name: Convert Markdown to RTF
+      shell: bash
+      run: python3 ${{ github.action_path }}/gfm_markdown_to_rtf.py ${{ inputs.input }} ${{ inputs.output }}
+
+    - name: Embed images into RTF
+      shell: bash
+      run: python3 ${{ github.action_path }}/rtf_image_embedder.py ${{ inputs.output }}
