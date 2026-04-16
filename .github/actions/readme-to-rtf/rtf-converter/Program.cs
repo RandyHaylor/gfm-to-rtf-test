@@ -6,10 +6,13 @@ using System.Xml;
 using System.Xml.Linq;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
-using DocumentFormat.OpenXml.Wordprocessing;
 using PdfSharpCore.Drawing;
 using PdfSharpCore.Pdf;
 using RtfPipe;
+
+using WpDocument = DocumentFormat.OpenXml.Wordprocessing.Document;
+using WpBody = DocumentFormat.OpenXml.Wordprocessing.Body;
+using AltChunk = DocumentFormat.OpenXml.Wordprocessing.AltChunk;
 
 class Program
 {
@@ -61,8 +64,8 @@ class Program
         using (var doc = WordprocessingDocument.Create(ms, WordprocessingDocumentType.Document))
         {
             var mainPart = doc.AddMainDocumentPart();
-            mainPart.Document = new Document();
-            var body = new Body();
+            mainPart.Document = new WpDocument();
+            var body = new WpBody();
 
             // Use the alternative XHTML import approach
             var altChunkId = "htmlChunk";
@@ -77,7 +80,7 @@ class Program
                 chunkStream.Write(bytes, 0, bytes.Length);
             }
 
-            var altChunk = new AltChunk { Id = altChunkId };
+            var altChunk = new AltChunk() { Id = altChunkId };
             body.Append(altChunk);
             mainPart.Document.Append(body);
         }
@@ -93,7 +96,7 @@ class Program
 
         var pdf = new PdfDocument();
         var font = new XFont("Courier", 10);
-        var boldFont = new XFont("Courier", 10, XFontStyleEx.Bold);
+        var boldFont = new XFont("Courier", 10, XFontStyle.Bold);
 
         var lines = plainText.Split('\n');
         var pageHeight = 792.0; // Letter
