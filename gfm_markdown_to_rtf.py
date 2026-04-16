@@ -251,64 +251,66 @@ def _handle_issue_ref(match):
         return f'{{\\field{{{_RTF_STAR_PLACEHOLDER}\\fldinst HYPERLINK "{url}"}}{{\\fldrslt \\cf2 #{number}}}}}'
     return f'{{\\cf2 #{number}}}'
 
+# Active output format — controls which replacement is used from multi-format rules
+_ACTIVE_FORMAT = 'rtf'
+
 INLINE_RULES = [
     # --- Phase 1: Strip/transform HTML and structural elements ---
-    ('html_comment',    (r'<!--.*?-->',                         '', re.DOTALL)),
-    ('html_picture',    (r'<picture>.*?<img\s+([^>]*)>.*?</picture>', r'<img \1>', re.DOTALL)),
-    ('html_source',     (r'<source[^>]*>',                      '')),
-    ('html_img',        (r'<img\s+[^>]*>',                      _handle_html_img)),
-    ('html_sub',        (r'<sub>(.*?)</sub>',                    r'{\\sub \1}')),
-    ('html_sup',        (r'<sup>(.*?)</sup>',                    r'{\\super \1}')),
-    ('html_ins',        (r'<ins>(.*?)</ins>',                    r'{\\ul \1}')),
-    ('html_br',         (r'<br\s*/?>',                           r'\\line ')),
+    # These are format-neutral (same for all outputs)
+    ('html_comment',    (r'<!--.*?-->',                         {'rtf': '', 'docx': '', 'pdf': ''}, re.DOTALL)),
+    ('html_picture',    (r'<picture>.*?<img\s+([^>]*)>.*?</picture>', {'rtf': r'<img \1>'}, re.DOTALL)),
+    ('html_source',     (r'<source[^>]*>',                      {'rtf': ''})),
+    ('html_img',        (r'<img\s+[^>]*>',                      {'rtf': _handle_html_img})),
+    ('html_sub',        (r'<sub>(.*?)</sub>',                    {'rtf': r'{\\sub \1}'})),
+    ('html_sup',        (r'<sup>(.*?)</sup>',                    {'rtf': r'{\\super \1}'})),
+    ('html_ins',        (r'<ins>(.*?)</ins>',                    {'rtf': r'{\\ul \1}'})),
+    ('html_br',         (r'<br\s*/?>',                           {'rtf': r'\\line '})),
 
     # --- Phase 2: Escaped chars -> placeholders (before any markdown matching) ---
-    ('escaped_char',    (r'\\([*#_~`\[\]\\])',                   _handle_escaped_char)),
+    ('escaped_char',    (r'\\([*#_~`\[\]\\])',                   {'rtf': _handle_escaped_char})),
 
     # --- Phase 3: Images and links (before inline code, which uses backticks) ---
-    ('md_image',        (r'!\[([^\]]*)\]\(([^)]+)\)',            r'{\\cf3 [Image: \1 \\u8212? \2]}')),
-    ('md_link',         (r'\[([^\]]+)\]\(([^)]+)\)',             _handle_md_link)),
-    ('bare_url',        (r'(?<!["\(])https?://[^\s<>\)]+',       _handle_bare_url)),
+    ('md_image',        (r'!\[([^\]]*)\]\(([^)]+)\)',            {'rtf': r'{\\cf3 [Image: \1 \\u8212? \2]}'})),
+    ('md_link',         (r'\[([^\]]+)\]\(([^)]+)\)',             {'rtf': _handle_md_link})),
+    ('bare_url',        (r'(?<!["\(])https?://[^\s<>\)]+',       {'rtf': _handle_bare_url})),
 
     # --- Phase 4: Inline code (stash content to protect from emoji/mention rules) ---
-    ('inline_code',     (r'`([^`]+)`',                           lambda m: _stash_inline_code(m.group(1)))),
+    ('inline_code',     (r'`([^`]+)`',                           {'rtf': lambda m: _stash_inline_code(m.group(1))})),
 
     # --- Phase 5: GitHub-specific inline elements ---
-    ('mention',         (r'@(\w[\w/-]*)',                         _handle_mention)),
-    ('issue_ref',       (r'(?<![&A-Fa-f0-9])#(\d+)\b',          _handle_issue_ref)),
-    ('footnote_ref',    (r'\[\^([^\]]+)\]',                      lambda m: f'{{\\super {{\\field{{{_RTF_STAR_PLACEHOLDER}\\fldinst HYPERLINK \\\\l "fn-{m.group(1)}"}}{{\\fldrslt \\cf2  [{m.group(1)}] }}}}}}')),
-    ('emoji',           (r':\w+:',                                _handle_emoji)),
+    ('mention',         (r'@(\w[\w/-]*)',                         {'rtf': _handle_mention})),
+    ('issue_ref',       (r'(?<![&A-Fa-f0-9])#(\d+)\b',          {'rtf': _handle_issue_ref})),
+    ('footnote_ref',    (r'\[\^([^\]]+)\]',                      {'rtf': lambda m: f'{{\\super {{\\field{{{_RTF_STAR_PLACEHOLDER}\\fldinst HYPERLINK \\\\l "fn-{m.group(1)}"}}{{\\fldrslt \\cf2  [{m.group(1)}] }}}}}}'})),
+    ('emoji',           (r':\w+:',                                {'rtf': _handle_emoji})),
 
     # --- Phase 6: Text formatting ---
-    ('bold_italic',     (r'\*\*\*(.+?)\*\*\*',                   r'{\\b\\i \1}')),
-    ('bold_star',       (r'\*\*(.+?)\*\*',                        r'{\\b \1}')),
-    ('bold_under',      (r'__(.+?)__',                             r'{\\b \1}')),
-    ('italic_star',     (r'\*(.+?)\*',                             r'{\\i \1}')),
-    ('italic_under',    (r'(?<!\w)_(.+?)_(?!\w)',                  r'{\\i \1}')),
-    ('strikethrough',   (r'~~(.+?)~~',                             r'{\\strike \1}')),
+    ('bold_italic',     (r'\*\*\*(.+?)\*\*\*',                   {'rtf': r'{\\b\\i \1}'})),
+    ('bold_star',       (r'\*\*(.+?)\*\*',                        {'rtf': r'{\\b \1}'})),
+    ('bold_under',      (r'__(.+?)__',                             {'rtf': r'{\\b \1}'})),
+    ('italic_star',     (r'\*(.+?)\*',                             {'rtf': r'{\\i \1}'})),
+    ('italic_under',    (r'(?<!\w)_(.+?)_(?!\w)',                  {'rtf': r'{\\i \1}'})),
+    ('strikethrough',   (r'~~(.+?)~~',                             {'rtf': r'{\\strike \1}'})),
 ]
 
 
-def apply_inline_rules(text):
-    """Apply all inline conversion rules in order."""
+def apply_inline_rules(text, fmt=None):
+    """Apply all inline conversion rules in order for the given format."""
+    target_fmt = fmt or _ACTIVE_FORMAT
     for rule_name, rule_def in INLINE_RULES:
-        if callable(rule_def):
-            # rule_def is a standalone callable — shouldn't happen with current structure
-            text = rule_def(text)
-        elif len(rule_def) == 3 and isinstance(rule_def[2], int):
-            # (pattern, replacement, flags)
-            pattern, replacement, flags = rule_def
-            if callable(replacement):
-                text = re.sub(pattern, replacement, text, flags=flags)
-            else:
-                text = re.sub(pattern, replacement, text, flags=flags)
+        # rule_def is (pattern, format_dict) or (pattern, format_dict, flags)
+        pattern = rule_def[0]
+        format_dict = rule_def[1]
+        flags = rule_def[2] if len(rule_def) == 3 and isinstance(rule_def[2], int) else 0
+
+        # Get replacement for the target format, fall back to 'rtf'
+        replacement = format_dict.get(target_fmt, format_dict.get('rtf'))
+        if replacement is None:
+            continue
+
+        if callable(replacement):
+            text = re.sub(pattern, replacement, text, flags=flags)
         else:
-            # (pattern, replacement)
-            pattern, replacement = rule_def[0], rule_def[1]
-            if callable(replacement):
-                text = re.sub(pattern, replacement, text)
-            else:
-                text = re.sub(pattern, replacement, text)
+            text = re.sub(pattern, replacement, text, flags=flags)
 
     # Final phase: restore placeholders
     text = text.replace(_ESCAPE_PLACEHOLDER, '')
