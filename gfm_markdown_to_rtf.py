@@ -261,10 +261,14 @@ INLINE_RULES = [
     ('html_picture',    (r'<picture>.*?<img\s+([^>]*)>.*?</picture>', {'rtf': r'<img \1>'}, re.DOTALL)),
     ('html_source',     (r'<source[^>]*>',                      {'rtf': ''})),
     ('html_img',        (r'<img\s+[^>]*>',                      {'rtf': _handle_html_img})),
-    ('html_sub',        (r'<sub>(.*?)</sub>',                    {'rtf': r'{\\sub \1}'})),
-    ('html_sup',        (r'<sup>(.*?)</sup>',                    {'rtf': r'{\\super \1}'})),
-    ('html_ins',        (r'<ins>(.*?)</ins>',                    {'rtf': r'{\\ul \1}'})),
-    ('html_br',         (r'<br\s*/?>',                           {'rtf': r'\\line '})),
+    ('html_sub',        (r'<sub>(.*?)</sub>',                    {'rtf': r'{\\sub \1}',
+                                                                    'docx': r'<w:r><w:rPr><w:vertAlign w:val="subscript"/></w:rPr><w:t>\1</w:t></w:r>'})),
+    ('html_sup',        (r'<sup>(.*?)</sup>',                    {'rtf': r'{\\super \1}',
+                                                                    'docx': r'<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:t>\1</w:t></w:r>'})),
+    ('html_ins',        (r'<ins>(.*?)</ins>',                    {'rtf': r'{\\ul \1}',
+                                                                    'docx': r'<w:r><w:rPr><w:u w:val="single"/></w:rPr><w:t>\1</w:t></w:r>'})),
+    ('html_br',         (r'<br\s*/?>',                           {'rtf': r'\\line ',
+                                                                    'docx': r'<w:r><w:br/></w:r>'})),
 
     # --- Phase 2: Escaped chars -> placeholders (before any markdown matching) ---
     ('escaped_char',    (r'\\([*#_~`\[\]\\])',                   {'rtf': _handle_escaped_char})),
@@ -284,12 +288,18 @@ INLINE_RULES = [
     ('emoji',           (r':\w+:',                                {'rtf': _handle_emoji})),
 
     # --- Phase 6: Text formatting ---
-    ('bold_italic',     (r'\*\*\*(.+?)\*\*\*',                   {'rtf': r'{\\b\\i \1}'})),
-    ('bold_star',       (r'\*\*(.+?)\*\*',                        {'rtf': r'{\\b \1}'})),
-    ('bold_under',      (r'__(.+?)__',                             {'rtf': r'{\\b \1}'})),
-    ('italic_star',     (r'\*(.+?)\*',                             {'rtf': r'{\\i \1}'})),
-    ('italic_under',    (r'(?<!\w)_(.+?)_(?!\w)',                  {'rtf': r'{\\i \1}'})),
-    ('strikethrough',   (r'~~(.+?)~~',                             {'rtf': r'{\\strike \1}'})),
+    ('bold_italic',     (r'\*\*\*(.+?)\*\*\*',                   {'rtf': r'{\\b\\i \1}',
+                                                                    'docx': r'<w:r><w:rPr><w:b/><w:i/></w:rPr><w:t xml:space="preserve">\1</w:t></w:r>'})),
+    ('bold_star',       (r'\*\*(.+?)\*\*',                        {'rtf': r'{\\b \1}',
+                                                                    'docx': r'<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">\1</w:t></w:r>'})),
+    ('bold_under',      (r'__(.+?)__',                             {'rtf': r'{\\b \1}',
+                                                                    'docx': r'<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">\1</w:t></w:r>'})),
+    ('italic_star',     (r'\*(.+?)\*',                             {'rtf': r'{\\i \1}',
+                                                                    'docx': r'<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">\1</w:t></w:r>'})),
+    ('italic_under',    (r'(?<!\w)_(.+?)_(?!\w)',                  {'rtf': r'{\\i \1}',
+                                                                    'docx': r'<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">\1</w:t></w:r>'})),
+    ('strikethrough',   (r'~~(.+?)~~',                             {'rtf': r'{\\strike \1}',
+                                                                    'docx': r'<w:r><w:rPr><w:strike/></w:rPr><w:t xml:space="preserve">\1</w:t></w:r>'})),
 ]
 
 
