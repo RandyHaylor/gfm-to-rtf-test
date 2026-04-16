@@ -102,6 +102,10 @@ _RTF_STAR_PLACEHOLDER = '\x00RTFSTAR'  # Protects \* in RTF fields from italic r
 _INLINE_CODE_STASH = {}  # Stash inline code content to protect from further rules
 _INLINE_CODE_PREFIX = '\x00CODE:'
 
+def _xml_escape(text):
+    """Escape XML special characters."""
+    return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+
 def rtf_escape(text):
     """Escape special RTF characters and handle unicode."""
     result = []
@@ -358,17 +362,17 @@ INLINE_RULES = [
 
     # --- Phase 6: Text formatting ---
     ('bold_italic',     (r'\*\*\*(.+?)\*\*\*',                   {'rtf': r'{\\b\\i \1}',
-                                                                    'docx': r'<w:r><w:rPr><w:b/><w:i/></w:rPr><w:t xml:space="preserve">\1</w:t></w:r>'})),
+                                                                    'docx': lambda m: f'<w:r><w:rPr><w:b/><w:i/></w:rPr><w:t xml:space="preserve">{_xml_escape(m.group(1))}</w:t></w:r>'})),
     ('bold_star',       (r'\*\*(.+?)\*\*',                        {'rtf': r'{\\b \1}',
-                                                                    'docx': r'<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">\1</w:t></w:r>'})),
+                                                                    'docx': lambda m: f'<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">{_xml_escape(m.group(1))}</w:t></w:r>'})),
     ('bold_under',      (r'__(.+?)__',                             {'rtf': r'{\\b \1}',
-                                                                    'docx': r'<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">\1</w:t></w:r>'})),
+                                                                    'docx': lambda m: f'<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">{_xml_escape(m.group(1))}</w:t></w:r>'})),
     ('italic_star',     (r'\*(.+?)\*',                             {'rtf': r'{\\i \1}',
-                                                                    'docx': r'<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">\1</w:t></w:r>'})),
+                                                                    'docx': lambda m: f'<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">{_xml_escape(m.group(1))}</w:t></w:r>'})),
     ('italic_under',    (r'(?<!\w)_(.+?)_(?!\w)',                  {'rtf': r'{\\i \1}',
-                                                                    'docx': r'<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">\1</w:t></w:r>'})),
+                                                                    'docx': lambda m: f'<w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">{_xml_escape(m.group(1))}</w:t></w:r>'})),
     ('strikethrough',   (r'~~(.+?)~~',                             {'rtf': r'{\\strike \1}',
-                                                                    'docx': r'<w:r><w:rPr><w:strike/></w:rPr><w:t xml:space="preserve">\1</w:t></w:r>'})),
+                                                                    'docx': lambda m: f'<w:r><w:rPr><w:strike/></w:rPr><w:t xml:space="preserve">{_xml_escape(m.group(1))}</w:t></w:r>'})),
 ]
 
 
@@ -790,11 +794,13 @@ def docx_block_heading(lines, index):
         level = len(heading_match.group(1))
         raw_text = heading_match.group(2)
         bookmark_id = _heading_to_bookmark_id(raw_text)
-        text = apply_inline_rules(raw_text, fmt='docx')
+        bid = hash(bookmark_id) % 10000
+        # Heading text — escape for XML, no inline formatting needed for headings
+        escaped = raw_text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
         xml = (f'<w:p><w:pPr><w:pStyle w:val="Heading{level}"/></w:pPr>'
-               f'<w:bookmarkStart w:id="{hash(bookmark_id) % 10000}" w:name="{bookmark_id}"/>'
-               f'<w:bookmarkEnd w:id="{hash(bookmark_id) % 10000}"/>'
-               f'<w:r><w:t xml:space="preserve">{text}</w:t></w:r></w:p>')
+               f'<w:bookmarkStart w:id="{bid}" w:name="{bookmark_id}"/>'
+               f'<w:bookmarkEnd w:id="{bid}"/>'
+               f'<w:r><w:t xml:space="preserve">{escaped}</w:t></w:r></w:p>')
         return (xml, 1)
     return None
 
@@ -876,9 +882,9 @@ def docx_block_table(lines, index):
     # Header row
     parts.append('<w:tr>')
     for cell in header_row:
-        formatted = apply_inline_rules(cell, fmt='docx')
+        escaped = cell.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
         parts.append(f'<w:tc><w:p><w:pPr><w:jc w:val="center"/></w:pPr>'
-                     f'<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">{formatted}</w:t></w:r></w:p></w:tc>')
+                     f'<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">{escaped}</w:t></w:r></w:p></w:tc>')
     parts.append('</w:tr>')
 
     for row in data_rows:
@@ -886,7 +892,8 @@ def docx_block_table(lines, index):
         for ci in range(num_cols):
             cell = row[ci] if ci < len(row) else ''
             formatted = apply_inline_rules(cell, fmt='docx')
-            parts.append(f'<w:tc><w:p><w:r><w:t xml:space="preserve">{formatted}</w:t></w:r></w:p></w:tc>')
+            wrapped = _docx_wrap_plain_text_in_runs(formatted)
+            parts.append(f'<w:tc><w:p>{wrapped}</w:p></w:tc>')
         parts.append('</w:tr>')
 
     parts.append('</w:tbl>')
@@ -927,14 +934,14 @@ def docx_block_blockquote(lines, index):
     parts = []
     for ql in quote_lines:
         text = apply_inline_rules(ql, fmt='docx') if ql.strip() else ''
+        wrapped = _docx_wrap_plain_text_in_runs(text) if text else ''
         if is_alert:
             parts.append(f'<w:p><w:pPr><w:ind w:left="720"/><w:shd w:val="clear" w:fill="E6F0FA"/></w:pPr>'
-                         f'<w:r><w:t xml:space="preserve">{text}</w:t></w:r></w:p>')
+                         f'{wrapped}</w:p>')
         else:
             parts.append(f'<w:p><w:pPr><w:ind w:left="720"/><w:pBdr>'
                          f'<w:left w:val="single" w:sz="12" w:space="4" w:color="CCCCCC"/>'
-                         f'</w:pBdr></w:pPr><w:r><w:rPr><w:color w:val="666666"/></w:rPr>'
-                         f'<w:t xml:space="preserve">{text}</w:t></w:r></w:p>')
+                         f'</w:pBdr></w:pPr>{wrapped}</w:p>')
     if is_alert:
         alert_para = (f'<w:p><w:pPr><w:ind w:left="720"/><w:shd w:val="clear" w:fill="E6F0FA"/></w:pPr>'
                       f'<w:r><w:rPr><w:b/><w:color w:val="365F91"/></w:rPr>'
@@ -967,9 +974,10 @@ def docx_block_list(lines, index):
             number = marker_type.split(':')[1]
             prefix = f'{number}. '
 
+        wrapped = _docx_wrap_plain_text_in_runs(formatted)
         parts.append(
             f'<w:p><w:pPr><w:ind w:left="{indent}"/><w:spacing w:after="40"/></w:pPr>'
-            f'<w:r><w:t xml:space="preserve">{prefix}{formatted}</w:t></w:r></w:p>'
+            f'<w:r><w:t xml:space="preserve">{prefix}</w:t></w:r>{wrapped}</w:p>'
         )
         consumed += 1
     return ('\n'.join(parts), consumed)
@@ -982,6 +990,23 @@ def docx_block_footnote_def(lines, index):
     ftext = match.group(2)
     _collected_footnotes.append((fid, ftext))
     return ('', 1)
+
+def _docx_wrap_plain_text_in_runs(text):
+    """Wrap any plain text segments (not already in <w:r> tags) into <w:r><w:t> runs."""
+    # Split on existing <w:r> and <w:hyperlink> elements, wrap the gaps
+    parts = re.split(r'(<w:(?:r|hyperlink|bookmarkStart|bookmarkEnd)[^>]*>.*?</w:(?:r|hyperlink)>|<w:(?:r|bookmarkStart|bookmarkEnd)\s*/>)', text, flags=re.DOTALL)
+    result = []
+    for part in parts:
+        if not part or part.startswith('<w:'):
+            result.append(part or '')
+        else:
+            # Plain text — wrap in a run
+            escaped = part.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            if escaped.strip():
+                result.append(f'<w:r><w:t xml:space="preserve">{escaped}</w:t></w:r>')
+            elif escaped:
+                result.append(f'<w:r><w:t xml:space="preserve">{escaped}</w:t></w:r>')
+    return ''.join(result)
 
 def docx_block_paragraph(lines, index):
     collected = []
@@ -1006,7 +1031,8 @@ def docx_block_paragraph(lines, index):
         return None
     paragraph_text = ' '.join(collected)
     formatted = apply_inline_rules(paragraph_text, fmt='docx')
-    return (f'<w:p><w:r><w:t xml:space="preserve">{formatted}</w:t></w:r></w:p>', consumed)
+    wrapped = _docx_wrap_plain_text_in_runs(formatted)
+    return (f'<w:p>{wrapped}</w:p>', consumed)
 
 
 # Ordered list of block rules — first match wins
