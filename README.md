@@ -1,6 +1,141 @@
-# Heading Level 1
+# :rocket: README to RTF — Auto-Convert GitHub READMEs to Rich Documents :tada:
 
-Paragraph text with a blank line above and below. This tests basic paragraph rendering.
+> **Your README.md, beautifully rendered as a shareable RTF file — automatically, on every push.**
+
+```
+README.md  ──▶  README.rtf  ──▶  Open anywhere. Share with anyone.
+```
+
+:sparkles: **Embedded Images** | :art: **Syntax-Highlighted Code Blocks** | :link: **Clickable Links & Footnotes** | :warning: **GitHub Alerts** | :memo: **Full GFM Support** | :rocket: **Emoji That Actually Render**
+
+---
+
+## Why?
+
+GitHub READMEs look great *on GitHub*. But what about:
+
+- :briefcase: **Sharing with non-developers** who don't have GitHub accounts?
+- :page_facing_up: **Attaching to proposals, grants, or reports** that need a real document?
+- :airplane: **Reading offline** without a browser?
+- :printer: **Printing** with proper formatting?
+
+This project auto-generates a **rich, formatted RTF file** from your `README.md` every time you push. The RTF opens in LibreOffice, Word, WordPad, TextEdit — any word processor on any OS.
+
+## What You Get
+
+| Feature | Status |
+|---------|--------|
+| Headings (h1-h6) with sizes | :white_check_mark: |
+| **Bold**, *italic*, ~~strikethrough~~ | :white_check_mark: |
+| Clickable hyperlinks | :white_check_mark: |
+| Internal document links (section anchors) | :white_check_mark: |
+| `@mention` links to GitHub profiles | :white_check_mark: |
+| `#issue` links to repo issues | :white_check_mark: |
+| Fenced code blocks with **syntax highlighting** | :white_check_mark: |
+| Inline code with background shading | :white_check_mark: |
+| Embedded images with auto-scaling | :white_check_mark: |
+| Oversized image clamping to page bounds | :white_check_mark: |
+| Tables with borders | :white_check_mark: |
+| Ordered, unordered, and task lists | :white_check_mark: |
+| GitHub alerts (Note, Tip, Important, Warning, Caution) | :white_check_mark: |
+| Blockquotes | :white_check_mark: |
+| Footnotes with clickable references | :white_check_mark: |
+| Emoji via surrogate pairs | :white_check_mark: |
+| Horizontal rules | :white_check_mark: |
+
+## Quick Start
+
+### 1. Copy the action into your repo
+
+```bash
+mkdir -p .github/actions/readme-to-rtf
+cp action.yml gfm_markdown_to_rtf.py rtf_image_embedder.py .github/actions/readme-to-rtf/
+```
+
+### 2. Add the workflow
+
+Create `.github/workflows/readme-to-rtf.yml`:
+
+```yaml
+name: Convert README to RTF
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'README.md'
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Convert README to RTF
+        uses: ./.github/actions/readme-to-rtf
+
+      - name: Configure git
+        shell: bash
+        run: git config user.name "github-actions[bot]"
+
+      - name: Configure git email
+        shell: bash
+        run: git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Stage RTF
+        shell: bash
+        run: git add README.rtf
+
+      - name: Commit if changed
+        shell: bash
+        run: 'git diff --cached --quiet || git commit -m "auto-regenerate README.rtf from README.md"'
+
+      - name: Push
+        shell: bash
+        run: git push
+```
+
+### 3. Push and done
+
+Every time `README.md` changes, the workflow generates a fresh `README.rtf` and commits it to your repo. You can also trigger it manually from the Actions tab.
+
+## How It Works
+
+Two Python scripts, zero heavy dependencies:
+
+1. **`gfm_markdown_to_rtf.py`** — Parses GitHub-Flavored Markdown and generates RTF with a data-driven rule engine. Uses [Pygments](https://pygments.org/) for syntax highlighting. Resolves `@mentions` and `#issues` to GitHub URLs automatically.
+
+2. **`rtf_image_embedder.py`** — Standalone module that finds `[Image: ...]` placeholders in RTF, reads the referenced local images, downscales them to fit page bounds using [Pillow](https://pillow.readthedocs.io/), and embeds them as hex-encoded `\pict` blocks.
+
+### Dependencies
+
+- **Python 3** (preinstalled on GitHub Actions runners)
+- **Pygments** (`pip install pygments`) — syntax highlighting for 500+ languages
+- **Pillow** (`pip install pillow`) — image processing for embedding and downscaling
+
+### Run Locally
+
+```bash
+pip install pygments pillow
+python3 gfm_markdown_to_rtf.py README.md README.rtf
+python3 rtf_image_embedder.py README.rtf
+```
+
+## Viewing Tips
+
+When opening the RTF in LibreOffice Writer:
+
+- **Disable red squiggles**: Tools > Automatic Spell Checking (toggle off)
+- **Read-only mode**: Edit > Edit Mode (toggle off) for a clean reading view
+- **Full screen**: `Ctrl+Shift+J`
+
+---
+
+# :test_tube: Test Content
+
+> Everything below exercises every GitHub-Flavored Markdown element supported by the converter. The generated `README.rtf` in this repo is living proof it all works — open it and compare!
 
 ## Heading Level 2
 
