@@ -1,4 +1,4 @@
-name: Convert README to RTF/DOCX/PDF
+name: Convert README to RTF/DOCX/TXT
 
 on:
   workflow_dispatch:
@@ -14,13 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
       - name: Convert README
-        uses: ./.github/actions/readme-to-rtf
+        uses: ./.github/actions/gh-readme2rtf-docx-txt
 
       - name: Configure git
         shell: bash
@@ -32,7 +27,7 @@ jobs:
 
       - name: Stage generated files
         shell: bash
-        run: git add *.rtf *.docx *.pdf example-module-with-readme/*.rtf 2>/dev/null || true
+        run: git add *.rtf *.docx *.txt example-module-with-readme/*.rtf 2>/dev/null || true
 
       - name: Commit if changed
         shell: bash

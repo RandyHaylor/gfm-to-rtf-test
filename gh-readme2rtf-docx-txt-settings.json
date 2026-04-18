@@ -2,7 +2,7 @@
   "files": [
     {
       "input": "README.md",
-      "output_formats": ["rtf", "docx", "pdf"],
+      "output_formats": ["rtf", "docx", "txt"],
       "attach_to_release": true,
       "commit_to_repo": true,
       "commit_to_repo_output_dir": "docs"

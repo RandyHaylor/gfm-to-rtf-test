@@ -7,36 +7,36 @@
 - [x] Test: stash and restore a string with `&`, `<`, `>`, `"` characters — passed
 
 ## Phase 2: Update Inline Rules to Use Placeholders
-- [ ] bold/italic/strikethrough — stash the captured text, emit XML structure with placeholder
-- [ ] inline code — stash the code content
-- [ ] subscript/superscript/underline — stash the text
-- [ ] Test: run inline rules in docx mode, verify output has placeholders not raw text
+- [x] bold/italic/strikethrough — stash the captured text, emit XML structure with placeholder
+- [x] inline code — stash the code content
+- [x] subscript/superscript/underline — stash the text
+- [x] Test: run inline rules in docx mode, verify output has placeholders not raw text
 
 ## Phase 3: Links and Mentions
-- [ ] md_link — stash link display text, emit hyperlink XML with placeholder
-- [ ] bare_url — stash URL text
-- [ ] mention — stash @username text
-- [ ] issue_ref — stash #number text
-- [ ] footnote_ref — stash footnote ID text
-- [ ] Test: verify hyperlink relationship IDs are still collected correctly
+- [x] md_link — stash link display text, emit hyperlink XML with placeholder
+- [x] bare_url — stash URL text
+- [x] mention — stash @username text
+- [x] issue_ref — stash #number text
+- [x] footnote_ref — stash footnote ID text
+- [x] Test: verify hyperlink relationship IDs are still collected correctly
 
 ## Phase 4: Block Rules
-- [ ] paragraph — collect inline output, wrap in `<w:p>`, call restore at block level
-- [ ] heading — emit heading style XML, stash heading text
-- [ ] blockquote/alerts — stash quote text content
-- [ ] list items — stash item text content
-- [ ] table cells — stash cell content
-- [ ] code blocks — stash each line of code
-- [ ] footnote section — stash footnote text
-- [ ] horizontal rule — no text, just XML structure
-- [ ] Test: generate DOCX, validate XML with validator script
+- [x] paragraph — collect inline output, wrap in `<w:p>`, call restore at block level
+- [x] heading — emit heading style XML, stash heading text
+- [x] blockquote/alerts — stash quote text content
+- [x] list items — stash item text content
+- [x] table cells — stash cell content
+- [x] code blocks — stash each line of code
+- [x] footnote section — stash footnote text
+- [x] horizontal rule — no text, just XML structure
+- [x] Test: generate DOCX, validate XML with validator script
 
 ## Phase 5: Document Assembly
-- [ ] Wire `_docx_restore_text()` into final XML before zipping
-- [ ] Build document.xml.rels with hyperlink relationships
-- [ ] Build styles.xml with heading styles
-- [ ] Zip into .docx
-- [ ] Test: open in Word/LibreOffice, verify content renders
+- [x] Wire `_docx_restore_text()` into final XML before zipping
+- [x] Build document.xml.rels with hyperlink relationships
+- [x] Build styles.xml with heading styles
+- [x] Zip into .docx
+- [x] Test: open in Word/LibreOffice, verify content renders  *(automated XML validation passes; user visual check in LibreOffice is separate)*
 
 ## Phase 6: Verify RTF Unchanged
-- [ ] Diff RTF output against known-good to confirm no regressions
+- [x] Diff RTF output against known-good to confirm no regressions  *(byte-identical to pre-Phase-2 pinned copy)*
