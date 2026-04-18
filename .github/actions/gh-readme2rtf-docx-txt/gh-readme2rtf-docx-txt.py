@@ -441,7 +441,8 @@ def _detect_github_repo():
             return _GITHUB_REPO_SLUG
     except Exception:
         pass
-    env_slug = os.environ.get('GITHUB_REPOSITORY', '').strip()
+    import os as _os
+    env_slug = _os.environ.get('GITHUB_REPOSITORY', '').strip()
     if env_slug:
         _GITHUB_REPO_SLUG = env_slug
         return _GITHUB_REPO_SLUG
@@ -1755,15 +1756,16 @@ def _txt_resolve_relative_links_only(markdown_text, input_file_path=None):
         url = match.group(2)
         if url.startswith(('http://', 'https://', '#', 'mailto:')):
             return match.group(0)  # leave absolute links and anchors unchanged
-        # Resolve the relative path against the input file's directory
-        if input_dir_relative_to_repo_root:
+        # ../file.txt → strip leading ../ and resolve against repo root
+        if url.startswith('../'):
+            resolved_path = url[3:]
+        elif input_dir_relative_to_repo_root:
             resolved_path = posixpath.normpath(
                 posixpath.join(input_dir_relative_to_repo_root, url)
             )
         else:
             resolved_path = posixpath.normpath(url)
-        # If the resolved path escapes the repo root (e.g. ../outside), leave unchanged
-        if resolved_path.startswith('..'):
+        if not resolved_path or resolved_path.startswith('..'):
             return match.group(0)
         full_url = f'{base_github_blob_url}/{resolved_path}'
         return f'[{link_text}]({full_url})'
