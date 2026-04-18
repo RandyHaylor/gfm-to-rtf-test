@@ -1,0 +1,90 @@
+name: Build release install zip
+
+# Repo-internal workflow: packages the install-ready file layout into a zip and
+# attaches it to a release. Not part of the tool deliverable — users who install
+# gh-readme2rtf-docx-txt never see this workflow.
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  build_and_attach_install_zip:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine target release tag
+        id: determine_release_tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIGGERING_EVENT_NAME: ${{ github.event_name }}
+          TRIGGERING_RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [ "$TRIGGERING_EVENT_NAME" = "release" ]; then
+            echo "Using release tag from triggering event: $TRIGGERING_RELEASE_TAG"
+            echo "tag=$TRIGGERING_RELEASE_TAG" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          latest_release_tag=$(gh release view --json tagName --jq .tagName 2>/dev/null || true)
+          if [ -z "$latest_release_tag" ]; then
+            echo "::error::No release is active and no existing releases were found. Create a release first, then re-run this workflow."
+            exit 1
+          fi
+          echo "workflow_dispatch run — falling back to latest release tag: $latest_release_tag"
+          echo "tag=$latest_release_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Stage install layout into a build directory
+        shell: bash
+        env:
+          INSTALL_STAGING_DIR: install-staging
+        run: |
+          # Build a directory that mirrors the exact layout the user should unzip at their repo root.
+          mkdir -p "$INSTALL_STAGING_DIR/.github/workflows"
+          mkdir -p "$INSTALL_STAGING_DIR/.github/actions/gh-readme2rtf-docx-txt"
+
+          cp .github/workflows/gh-readme2rtf-docx-txt.yml        "$INSTALL_STAGING_DIR/.github/workflows/"
+          cp .github/actions/gh-readme2rtf-docx-txt/action.yml    "$INSTALL_STAGING_DIR/.github/actions/gh-readme2rtf-docx-txt/"
+          cp .github/actions/gh-readme2rtf-docx-txt/gh-readme2rtf-docx-txt.py "$INSTALL_STAGING_DIR/.github/actions/gh-readme2rtf-docx-txt/"
+          cp .github/actions/gh-readme2rtf-docx-txt/rtf_image_embedder.py    "$INSTALL_STAGING_DIR/.github/actions/gh-readme2rtf-docx-txt/"
+
+          cp gh-readme2rtf-docx-txt-settings.json                "$INSTALL_STAGING_DIR/"
+
+          # Rendered README, renamed as the tool's own user-facing doc. This is
+          # produced by the convert workflow on every push to README.md, so
+          # whatever is at HEAD should be current.
+          if [ -f README.rtf ]; then
+            cp README.rtf "$INSTALL_STAGING_DIR/gh-readme2rtf-docx-txt.rtf"
+          else
+            echo "::warning::README.rtf not found at repo root; zip will ship without the renamed reference doc."
+          fi
+
+          echo "Staged contents:"
+          find "$INSTALL_STAGING_DIR" -type f -print
+
+      - name: Create zip
+        shell: bash
+        env:
+          INSTALL_STAGING_DIR: install-staging
+          INSTALL_ZIP_NAME: gh-readme2rtf-docx-txt-install.zip
+        run: |
+          cd "$INSTALL_STAGING_DIR"
+          # -r recurses; -X strips extra attrs for deterministic output.
+          zip -r -X "../$INSTALL_ZIP_NAME" .
+          cd ..
+          echo "Zip contents:"
+          unzip -l "$INSTALL_ZIP_NAME"
+
+      - name: Upload zip asset to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INSTALL_ZIP_NAME: gh-readme2rtf-docx-txt-install.zip
+          TARGET_RELEASE_TAG: ${{ steps.determine_release_tag.outputs.tag }}
+        run: |
+          echo "Uploading $INSTALL_ZIP_NAME to release $TARGET_RELEASE_TAG"
+          gh release upload "$TARGET_RELEASE_TAG" "$INSTALL_ZIP_NAME" --clobber
