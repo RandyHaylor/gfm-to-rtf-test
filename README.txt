@@ -50,14 +50,28 @@ TXT output is a link-resolved plain-text render — markdown structure preserved
 
 ## Quick Start
 
-### 1. Copy the action into your repo
+### 1. Files you need — download the zip from Releases and extract at your repo root
 
-```bash
-mkdir -p .github/actions/gh-readme2rtf-docx-txt
-cp action.yml gh-readme2rtf-docx-txt.py rtf_image_embedder.py \
-   .github/actions/gh-readme2rtf-docx-txt/
-cp gh-readme2rtf-docx-txt-settings.json .
+Grab the latest **`gh-readme2rtf-docx-txt-install.zip`** from the [Releases](../../releases) page and unzip it at the root of your project. The zip mirrors the final install layout, so extraction drops everything into the correct place:
+
 ```
+your-repo/
+├── gh-readme2rtf-docx-txt-settings.json    ◄── the only file at your repo root
+│
+└── .github/
+    ├── workflows/
+    │   └── gh-readme2rtf-docx-txt.yml      ◄── the workflow GitHub Actions discovers
+    │
+    └── actions/
+        └── gh-readme2rtf-docx-txt/
+            ├── action.yml                  ◄── composite action definition
+            ├── gh-readme2rtf-docx-txt.py   ◄── the converter (GFM → RTF/DOCX/TXT)
+            └── rtf_image_embedder.py       ◄── RTF image post-processor
+```
+
+The zip also includes `gh-readme2rtf-docx-txt.rtf` (a renamed copy of this README rendered to RTF) so you can see a working example of the tool's output right next to the files.
+
+> **Why this layout?** The workflow YAML must live directly in `.github/workflows/` — GitHub only discovers workflows at that exact path. Everything else (the composite action, Python scripts) is consolidated into one sibling folder, `.github/actions/gh-readme2rtf-docx-txt/`. The settings file sits at the repo root so it's easy to find and edit.
 
 ### 2. Configure which files and formats to generate
 

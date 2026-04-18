@@ -255,12 +255,22 @@ Horizontal rules\cell
 \row}
 {\pard\sb0\sa120\f0\fs22 TXT output is a link-resolved plain-text render \u8212? markdown structure preserved, link targets rewritten, no binary formatting.\par}
 {\pard\sb280\sa120\keepn\f0\fs36\cf2\b {\*\bkmkstart quick-start}Quick Start{\*\bkmkend quick-start}\par}
-{\pard\sb240\sa120\keepn\f0\fs30\cf2\b {\*\bkmkstart 1-copy-the-action-into-your-repo}1. Copy the action into your repo{\*\bkmkend 1-copy-the-action-into-your-repo}\par}
-{\pard\sb100\sa100\f1\fs20\cbpat8\li360\ri360 mkdir -p .github/actions/gh-readme2rtf-docx-txt\line
-cp action.yml gh-readme2rtf-docx-txt.py rtf_image_embedder.py \cf19 \\\line
-\cf1    .github/actions/gh-readme2rtf-docx-txt/\line
-cp gh-readme2rtf-docx-txt-settings.json .\line
-\par}
+{\pard\sb240\sa120\keepn\f0\fs30\cf2\b {\*\bkmkstart 1-files-you-need-download-the-zip-from-releases-and-extract-at-your-repo-root}1. Files you need \u8212? download the zip from Releases and extract at your repo root{\*\bkmkend 1-files-you-need-download-the-zip-from-releases-and-extract-at-your-repo-root}\par}
+{\pard\sb0\sa120\f0\fs22 Grab the latest {\b {\f1\fs20\chshdng1\chcbpat8 gh-readme2rtf-docx-txt-install.zip}} from the {\field{\*\fldinst HYPERLINK "../../releases"}{\fldrslt \cf2 Releases}} page and unzip it at the root of your project. The zip mirrors the final install layout, so extraction drops everything into the correct place:\par}
+{\pard\sb100\sa100\f1\fs20\cbpat8\li360\ri360 your-repo/\line
+\u9500?\u9472?\u9472? gh-readme2rtf-docx-txt-settings.json    \u9668?\u9472?\u9472? the only file at your repo root\line
+\u9474?\line
+\u9492?\u9472?\u9472? .github/\line
+    \u9500?\u9472?\u9472? workflows/\line
+    \u9474?   \u9492?\u9472?\u9472? gh-readme2rtf-docx-txt.yml      \u9668?\u9472?\u9472? the workflow GitHub Actions discovers\line
+    \u9474?\line
+    \u9492?\u9472?\u9472? actions/\line
+        \u9492?\u9472?\u9472? gh-readme2rtf-docx-txt/\line
+            \u9500?\u9472?\u9472? action.yml                  \u9668?\u9472?\u9472? composite action definition\line
+            \u9500?\u9472?\u9472? gh-readme2rtf-docx-txt.py   \u9668?\u9472?\u9472? the converter (GFM \u8594? RTF/DOCX/TXT)\line
+            \u9492?\u9472?\u9472? rtf_image_embedder.py       \u9668?\u9472?\u9472? RTF image post-processor\par}
+{\pard\sb0\sa120\f0\fs22 The zip also includes {\f1\fs20\chshdng1\chcbpat8 gh-readme2rtf-docx-txt.rtf} (a renamed copy of this README rendered to RTF) so you can see a working example of the tool's output right next to the files.\par}
+{\pard\sb60\sa60\li480\brdrl\brdrs\brdrw20\brsp80\cf3\f0\fs22 {\b Why this layout?} The workflow YAML must live directly in {\f1\fs20\chshdng1\chcbpat8 .github/workflows/} \u8212? GitHub only discovers workflows at that exact path. Everything else (the composite action, Python scripts) is consolidated into one sibling folder, {\f1\fs20\chshdng1\chcbpat8 .github/actions/gh-readme2rtf-docx-txt/}. The settings file sits at the repo root so it's easy to find and edit.\par}
 {\pard\sb240\sa120\keepn\f0\fs30\cf2\b {\*\bkmkstart 2-configure-which-files-and-formats-to-generate}2. Configure which files and formats to generate{\*\bkmkend 2-configure-which-files-and-formats-to-generate}\par}
 {\pard\sb0\sa120\f0\fs22 Edit {\f1\fs20\chshdng1\chcbpat8 gh-readme2rtf-docx-txt-settings.json} at the repo root:\par}
 {\pard\sb100\sa100\f1\fs20\cbpat8\li360\ri360 \cf23 \{\cf1 \line
