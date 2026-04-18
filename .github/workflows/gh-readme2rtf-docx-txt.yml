@@ -4,7 +4,9 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - 'gh-readme2rtf-docx-txt-settings.json'
       - 'README.md'
+      - 'example-module-with-readme/README.md'
 
 jobs:
   convert:
@@ -14,16 +16,83 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Convert README
-        uses: ./.github/actions/gh-readme2rtf-docx-txt
-
-      - name: Configure git
+      - name: Configure git identity
         shell: bash
         run: git config user.name "github-actions[bot]"
 
       - name: Configure git email
         shell: bash
         run: git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync workflow trigger paths to settings file
+        shell: python
+        env:
+          SETTINGS_PATH: gh-readme2rtf-docx-txt-settings.json
+          WORKFLOW_PATH: .github/workflows/gh-readme2rtf-docx-txt.yml
+        run: |
+          import json
+          import os
+          import pathlib
+
+          settings_file_path = os.environ['SETTINGS_PATH']
+          workflow_file_path = os.environ['WORKFLOW_PATH']
+
+          with open(settings_file_path) as settings_file_handle:
+              settings_data = json.load(settings_file_handle)
+
+          desired_trigger_paths = [settings_file_path]
+          for file_entry in settings_data.get('files', []):
+              tracked_input_path = file_entry.get('input')
+              if tracked_input_path and tracked_input_path not in desired_trigger_paths:
+                  desired_trigger_paths.append(tracked_input_path)
+
+          workflow_original_text = pathlib.Path(workflow_file_path).read_text()
+          workflow_original_lines = workflow_original_text.splitlines(keepends=True)
+
+          rewritten_workflow_lines = []
+          line_scan_index = 0
+          paths_block_already_rewritten = False
+          while line_scan_index < len(workflow_original_lines):
+              current_line = workflow_original_lines[line_scan_index]
+              rewritten_workflow_lines.append(current_line)
+              if current_line.strip() == 'paths:' and not paths_block_already_rewritten:
+                  paths_line_indent = current_line[:len(current_line) - len(current_line.lstrip())]
+                  list_item_indent = paths_line_indent + '  '
+                  next_scan_index = line_scan_index + 1
+                  while next_scan_index < len(workflow_original_lines):
+                      candidate_line = workflow_original_lines[next_scan_index]
+                      stripped = candidate_line.strip()
+                      if stripped.startswith('- ') and candidate_line.startswith(list_item_indent):
+                          next_scan_index += 1
+                          continue
+                      break
+                  for path_to_emit in desired_trigger_paths:
+                      rewritten_workflow_lines.append(f"{list_item_indent}- '{path_to_emit}'\n")
+                  line_scan_index = next_scan_index
+                  paths_block_already_rewritten = True
+                  continue
+              line_scan_index += 1
+
+          workflow_rewritten_text = ''.join(rewritten_workflow_lines)
+          if workflow_rewritten_text != workflow_original_text:
+              pathlib.Path(workflow_file_path).write_text(workflow_rewritten_text)
+              print('workflow trigger paths updated to:', desired_trigger_paths)
+          else:
+              print('workflow trigger paths already in sync with settings')
+
+      - name: Commit workflow sync if changed
+        shell: bash
+        run: |
+          git add .github/workflows/gh-readme2rtf-docx-txt.yml
+          if git diff --cached --quiet; then
+            echo "workflow already in sync with settings — nothing to commit"
+            exit 0
+          fi
+          git commit -m "auto-sync workflow trigger paths to settings file"
+          git push
+
+      - name: Convert README
+        uses: ./.github/actions/gh-readme2rtf-docx-txt
 
       - name: Stage generated files
         shell: bash
