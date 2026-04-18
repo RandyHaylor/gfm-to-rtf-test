@@ -982,11 +982,53 @@ def docx_block_html_img(lines, index):
     formatted = apply_inline_rules(lines[index].strip(), fmt='docx')
     return (f'<w:p>{formatted}</w:p>', 1)
 
+# Map RTF color index -> DOCX hex (mirrors the colortbl entries above)
+_DOCX_SYNTAX_HEX_BY_RTF_INDEX = {
+    1:  '000000',  # black / default
+    18: '000080',  # keyword (navy)
+    19: 'A31515',  # string (brown)
+    20: '008000',  # comment (green)
+    21: '2B91AF',  # type (teal)
+    22: '800080',  # builtin (purple)
+    23: '808080',  # punctuation (gray)
+    24: '0000FF',  # number (blue)
+}
+
+def _syntax_highlighted_docx_runs_by_line(code_text, language):
+    """Tokenize `code_text` with Pygments and return a list of lines, where each
+    line is a list of (text_segment, hex_color_or_None) tuples. Lines are split
+    on '\n' inside tokens so callers can emit one <w:p> per line."""
+    if not PYGMENTS_AVAILABLE or not language:
+        return [[(seg, None)] for seg in code_text.split('\n')]
+    try:
+        lexer = get_lexer_by_name(language, stripall=False)
+    except Exception:
+        return [[(seg, None)] for seg in code_text.split('\n')]
+
+    lines_of_runs = [[]]
+    for token_type, token_value in lex(code_text, lexer):
+        # Walk up the token hierarchy to find a mapped RTF color index
+        color_rtf_index = None
+        tt = token_type
+        while tt and not color_rtf_index:
+            color_rtf_index = SYNTAX_COLOR_MAP.get(tt)
+            tt = tt.parent
+        hex_color = _DOCX_SYNTAX_HEX_BY_RTF_INDEX.get(color_rtf_index) if color_rtf_index else None
+        # Split the token's text on newlines, starting new paragraph buckets as we go
+        segments = token_value.split('\n')
+        for seg_idx, seg_text in enumerate(segments):
+            if seg_idx > 0:
+                lines_of_runs.append([])
+            if seg_text:
+                lines_of_runs[-1].append((seg_text, hex_color))
+    return lines_of_runs
+
 def docx_block_fenced_code(lines, index):
     fence_match = re.match(r'^(\s*)```(\w*)', lines[index])
     if not fence_match:
         return None
     indent = fence_match.group(1)
+    language = fence_match.group(2)
     consumed = 1
     code_lines = []
     while index + consumed < len(lines):
@@ -998,17 +1040,30 @@ def docx_block_fenced_code(lines, index):
             current_line = current_line[len(indent):]
         code_lines.append(current_line)
         consumed += 1
-    # Each line is a paragraph with monospace font and shaded background.
-    # Route each code line through the stash so the single final restore escapes it.
-    parts = []
-    for line in code_lines:
-        code_line_placeholder = docx_stash_user_text(line)
-        parts.append(
-            f'<w:p><w:pPr><w:shd w:val="clear" w:fill="E6F0FA"/><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>'
-            f'<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="20"/></w:rPr>'
-            f'<w:t xml:space="preserve">{code_line_placeholder}</w:t></w:r></w:p>'
+    raw_code = '\n'.join(code_lines)
+    lines_of_runs = _syntax_highlighted_docx_runs_by_line(raw_code, language)
+
+    paragraph_xml_parts = []
+    for run_tuples in lines_of_runs:
+        run_xml_parts = []
+        if not run_tuples:
+            # empty line — emit a single empty run so paragraph still has shading
+            run_tuples = [('', None)]
+        for seg_text, hex_color in run_tuples:
+            seg_placeholder = docx_stash_user_text(seg_text)
+            color_rpr_xml = f'<w:color w:val="{hex_color}"/>' if hex_color else ''
+            run_xml_parts.append(
+                f'<w:r><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/>'
+                f'<w:sz w:val="20"/>{color_rpr_xml}</w:rPr>'
+                f'<w:t xml:space="preserve">{seg_placeholder}</w:t></w:r>'
+            )
+        paragraph_xml_parts.append(
+            f'<w:p><w:pPr><w:shd w:val="clear" w:fill="E6F0FA"/>'
+            f'<w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr>'
+            + ''.join(run_xml_parts) +
+            f'</w:p>'
         )
-    return ('\n'.join(parts), consumed)
+    return ('\n'.join(paragraph_xml_parts), consumed)
 
 def docx_block_table(lines, index):
     line = lines[index]
