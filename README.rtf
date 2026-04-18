@@ -338,6 +338,73 @@ python3 rtf_image_embedder.py README.rtf\line
 \cf20 # TXT (link-resolved plain text)\line
 \cf1 python3 gh-readme2rtf-docx-txt.py README.md README.txt\line
 \par}
+{\pard\sb280\sa120\keepn\f0\fs36\cf2\b {\*\bkmkstart architecture-at-a-glance}Architecture at a Glance{\*\bkmkend architecture-at-a-glance}\par}
+{\pard\sb100\sa100\f1\fs20\cbpat8\li360\ri360 README.md  \u9472?\u9472?\u9654?  [ PARSER ]  \u9472?\u9472?\u9654?  [ CONVERSION TABLE ]  \u9472?\u9472?\u9654?  [ FORMAT POST-PASS ]  \u9472?\u9472?\u9654?  output\line
+                 block + inline     GFM element \u9472?\u9516?\u9472?\u9654? rtf       one cleanup pass\line
+                 line by line                    \u9500?\u9472?\u9654? docx      per file format\line
+                                                 \u9492?\u9472?\u9654? txt\par}
+{\pard\sb240\sa120\keepn\f0\fs30\cf2\b {\*\bkmkstart 1-parsing-read-it-line-by-line}1. Parsing \u8212? read it line by line{\*\bkmkend 1-parsing-read-it-line-by-line}\par}
+{\pard\sb0\sa120\f0\fs22 The converter walks {\f1\fs20\chshdng1\chcbpat8 README.md} top-to-bottom. Each line tries the {\b block handlers} in order (heading, fenced code, table, list, blockquote, footnote-def, paragraph\u8230?); first match wins. The matched block's text then flows through the {\b inline conversion table} for emphasis, links, emoji, {\f1\fs20\chshdng1\chcbpat8 @mentions}, and so on.\par}
+{\pard\sb240\sa120\keepn\f0\fs30\cf2\b {\*\bkmkstart 2-the-conversion-table-strategy-pattern-expressed-as-data}2. The conversion table \u8212? strategy pattern, expressed as data{\*\bkmkend 2-the-conversion-table-strategy-pattern-expressed-as-data}\par}
+{\pard\sb0\sa120\f0\fs22 Instead of three parallel converters ({\f1\fs20\chshdng1\chcbpat8 MarkdownToRtf}, {\f1\fs20\chshdng1\chcbpat8 MarkdownToDocx}, {\f1\fs20\chshdng1\chcbpat8 MarkdownToTxt}) with overridden methods, the codebase uses {\b one table} where each row is a GFM element and each column is a pure function that emits that element in one target format:\par}
+{\pard\sb100\sa100\f1\fs20\cbpat8\li360\ri360 INLINE_RULES \cf1 =\cf1  \cf23 [\cf1 \line
+    \cf20 # (name,           (pattern,                    \{'rtf': ...,       'docx': ...\}))\cf1 \line
+    \cf23 (\cf1 \cf19 '\cf1 \cf19 bold_star\cf1 \cf19 '\cf1 \cf23 ,\cf1       \cf23 (\cf1 \cf19 r\cf1 \cf19 '\cf1 \cf19 \\\cf1 \cf19 *\cf1 \cf19 \\\cf1 \cf19 *(.+?)\cf1 \cf19 \\\cf1 \cf19 *\cf1 \cf19 \\\cf1 \cf19 *\cf1 \cf19 '\cf1 \cf23 ,\cf1            \cf23 \{\cf1 \cf19 '\cf1 \cf19 rtf\cf1 \cf19 '\cf1 \cf23 :\cf1  \cf19 r\cf1 \cf19 '\cf1 \cf19 \{\cf1 \cf19 \\\cf1 \cf19 b \cf1 \cf19 \\\cf1 \cf19 1\}\cf1 \cf19 '\cf1 \cf23 ,\cf1        \cf19 '\cf1 \cf19 docx\cf1 \cf19 '\cf1 \cf23 :\cf1  docx_bold\cf23 \}\cf1 \cf23 )\cf1 \cf23 )\cf1 \cf23 ,\cf1 \line
+    \cf23 (\cf1 \cf19 '\cf1 \cf19 md_link\cf1 \cf19 '\cf1 \cf23 ,\cf1         \cf23 (\cf1 \cf19 r\cf1 \cf19 '\cf1 \cf19 \\\cf1 \cf19 [([^\cf1 \cf19 \\\cf1 \cf19 ]]+)\cf1 \cf19 \\\cf1 \cf19 ]\cf1 \cf19 \\\cf1 \cf19 (([^)]+)\cf1 \cf19 \\\cf1 \cf19 )\cf1 \cf19 '\cf1 \cf23 ,\cf1  \cf23 \{\cf1 \cf19 '\cf1 \cf19 rtf\cf1 \cf19 '\cf1 \cf23 :\cf1  rtf_link\cf23 ,\cf1          \cf19 '\cf1 \cf19 docx\cf1 \cf19 '\cf1 \cf23 :\cf1  docx_link\cf23 \}\cf1 \cf23 )\cf1 \cf23 )\cf1 \cf23 ,\cf1 \line
+    \cf23 (\cf1 \cf19 '\cf1 \cf19 emoji\cf1 \cf19 '\cf1 \cf23 ,\cf1           \cf23 (\cf1 \cf19 r\cf1 \cf19 '\cf1 \cf19 :\cf1 \cf19 \\\cf1 \cf19 w+:\cf1 \cf19 '\cf1 \cf23 ,\cf1                    \cf23 \{\cf1 \cf19 '\cf1 \cf19 rtf\cf1 \cf19 '\cf1 \cf23 :\cf1  rtf_emoji\cf23 ,\cf1         \cf19 '\cf1 \cf19 docx\cf1 \cf19 '\cf1 \cf23 :\cf1  docx_emoji\cf23 \}\cf1 \cf23 )\cf1 \cf23 )\cf1 \cf23 ,\cf1 \line
+    \cf23 (\cf1 \cf19 '\cf1 \cf19 footnote_ref\cf1 \cf19 '\cf1 \cf23 ,\cf1    \cf23 (\cf1 \cf19 r\cf1 \cf19 '\cf1 \cf19 \\\cf1 \cf19 [\cf1 \cf19 \\\cf1 \cf19 ^([^\cf1 \cf19 \\\cf1 \cf19 ]]+)\cf1 \cf19 \\\cf1 \cf19 ]\cf1 \cf19 '\cf1 \cf23 ,\cf1           \cf23 \{\cf1 \cf19 '\cf1 \cf19 rtf\cf1 \cf19 '\cf1 \cf23 :\cf1  rtf_footnote_ref\cf23 ,\cf1  \cf19 '\cf1 \cf19 docx\cf1 \cf19 '\cf1 \cf23 :\cf1  docx_footnote_ref\cf23 \}\cf1 \cf23 )\cf1 \cf23 )\cf1 \cf23 ,\cf1 \line
+    \cf20 # ...\cf1 \line
+\cf23 ]\cf1 \line
+\line
+BLOCK_RULES \cf1 =\cf1  \cf23 \{\cf1 \line
+    \cf19 '\cf1 \cf19 rtf\cf1 \cf19 '\cf1 \cf23 :\cf1   \cf23 [\cf1 block_heading\cf23 ,\cf1  block_fenced_code\cf23 ,\cf1  block_table\cf23 ,\cf1  block_list\cf23 ,\cf1  \cf1 .\cf1 \cf1 .\cf1 \cf1 .\cf1 \cf23 ]\cf1 \cf23 ,\cf1 \line
+    \cf19 '\cf1 \cf19 docx\cf1 \cf19 '\cf1 \cf23 :\cf1  \cf23 [\cf1 docx_block_heading\cf23 ,\cf1  docx_block_fenced_code\cf23 ,\cf1  docx_block_table\cf23 ,\cf1  \cf1 .\cf1 \cf1 .\cf1 \cf1 .\cf1 \cf23 ]\cf1 \cf23 ,\cf1 \line
+\cf23 \}\cf1 \line
+\par}
+{\pard\sb0\sa120\f0\fs22 The dispatcher is four lines: {\b look up the active format in the row's dict, call the function (or substitute the string), move on}. That's the {\b strategy pattern implemented functionally} \u8212? each strategy is a small pure function (or an {\f1\fs20\chshdng1\chcbpat8 re.sub} replacement string), chosen by dict key at runtime. No base class, no subclass hierarchy, no visitor.\par}
+{\pard\sb0\sa120\f0\fs22 What this feels like when you edit the code:\par}
+{\pard\sb36\sa36\li480\fi-360\f0\fs22 \u8226?  {\b Add a markdown feature} \u8594? add one row. (This is how {\f1\fs20\chshdng1\chcbpat8 <sub>}, {\f1\fs20\chshdng1\chcbpat8 <sup>}, {\f1\fs20\chshdng1\chcbpat8 <ins>}, and the emoji shortcode map were added.)\par}
+{\pard\sb36\sa36\li480\fi-360\f0\fs22 \u8226?  {\b Add a new output format} \u8594? add one key to every row. Dispatcher doesn't change.\par}
+{\pard\sb36\sa36\li480\fi-360\f0\fs22 \u8226?  {\b Tweak how bold renders in DOCX} \u8594? edit one cell. Other formats untouched.\par}
+{\pard\sb36\sa36\li480\fi-360\f0\fs22 \u8226?  Rules run in {\b phases} (HTML strip \u8594? escapes \u8594? links/images \u8594? inline code stash \u8594? GitHub refs \u8594? formatting), so later rows can assume earlier phases have already happened.\par}
+{\pard\sb240\sa120\keepn\f0\fs30\cf2\b {\*\bkmkstart 3-post-cleanup-per-doc-type}3. Post-cleanup per doc type{\*\bkmkend 3-post-cleanup-per-doc-type}\par}
+{\pard\sb0\sa120\f0\fs22 The conversion table handles {\i content}. Format-specific {\i plumbing} lives in a small post-pass so the core stays format-agnostic:\par}
+{\trowd
+\clbrdrt\brdrs\clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx3000
+\clbrdrt\brdrs\clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx6000
+\clbrdrt\brdrs\clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx9000
+\pard\intbl
+{\b Format}\cell
+{\b Post-pass}\cell
+{\b Why}\cell
+\row}
+{\trowd
+\clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx3000
+\clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx6000
+\clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx9000
+\pard\intbl
+{\b RTF}\cell
+{\f1\fs20\chshdng1\chcbpat8 rtf_image_embedder.py} swaps {\f1\fs20\chshdng1\chcbpat8 [Image: ...]} markers for hex-encoded {\f1\fs20\chshdng1\chcbpat8 \pict} blocks\cell
+Images get sized against page bounds only after layout is known\cell
+\row}
+{\trowd
+\clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx3000
+\clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx6000
+\clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx9000
+\pard\intbl
+{\b DOCX}\cell
+{\f1\fs20\chshdng1\chcbpat8 <w:sectPr>} gets injected into the last paragraph's {\f1\fs20\chshdng1\chcbpat8 <w:pPr>}\cell
+A body-level sectPr makes Word render a ghost trailing blank page\cell
+\row}
+{\trowd
+\clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx3000
+\clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx6000
+\clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx9000
+\pard\intbl
+{\b TXT}\cell
+{\f1\fs20\chshdng1\chcbpat8 _txt_resolve_relative_links_only} rewrites relative links to full GitHub URLs\cell
+Plain text has nothing else to process\cell
+\row}
 {\pard\sb280\sa120\keepn\f0\fs36\cf2\b {\*\bkmkstart viewing-tips}Viewing Tips{\*\bkmkend viewing-tips}\par}
 {\pard\sb0\sa120\f0\fs22 When opening the RTF in LibreOffice Writer:\par}
 {\pard\sb36\sa36\li480\fi-360\f0\fs22 \u8226?  {\b Disable red squiggles}: Tools > Automatic Spell Checking (toggle off)\par}
