@@ -27,4 +27,7 @@ example.doSomething("hello");
 > [!TIP]
 > This module works best with Node.js 18+.
 
+> [!NOTE]
+> Edited to test whether pushes to nested READMEs also trigger the conversion workflow.
+
 See the [main project README](../README.md) for more details.
