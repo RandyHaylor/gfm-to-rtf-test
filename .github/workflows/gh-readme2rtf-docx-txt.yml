@@ -136,9 +136,10 @@ jobs:
         shell: bash
         run: git push
 
-      - name: Fail job if release uploads were required but no release was active
+      - name: Fail job if the conversion step reported any errors
         if: steps.convert_readme.outcome == 'failure'
         shell: bash
         run: |
-          echo "Conversion step reported errors (see annotations above). Failing the job intentionally so the missing-release condition is visible."
+          echo "Conversion step reported one or more errors (missing inputs, conversion crashes, missing release tag, or upload failures — see the grouped error summary in the 'Convert README' step above)."
+          echo "Files that converted successfully were still committed to the repo."
           exit 1

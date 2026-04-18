@@ -41,45 +41,79 @@ runs:
         with open(config_path_from_env) as settings_file_handle:
             settings_data = json.load(settings_file_handle)
 
+        # Separate error buckets so the final summary can distinguish causes.
+        missing_input_file_errors = []
+        conversion_subprocess_errors = []
         missing_release_errors = []
+        release_upload_errors = []
 
         for file_entry in settings_data.get('files', []):
             input_file_path = file_entry['input']
+            entry_is_enabled = file_entry.get('enabled', True)
+            if not entry_is_enabled:
+                print(f'::notice::Skipping {input_file_path} — entry has enabled=false in settings.')
+                continue
+
+            if not os.path.exists(input_file_path):
+                missing_input_file_errors.append(
+                    f"Input file '{input_file_path}' does not exist. "
+                    f"Either set 'enabled': false for this entry in the settings file, "
+                    f"remove the entry, or restore the missing file."
+                )
+                continue
+
             output_formats_for_entry = file_entry.get('output_formats', ['rtf'])
             attach_this_entry_to_release = file_entry.get('attach_to_release', False)
             base_path_without_extension = input_file_path.rsplit('.', 1)[0]
             produced_output_file_paths = []
 
+            def run_converter_with_failure_tracking(conversion_args_list, produced_path_to_record):
+                """Run the converter subprocess; on failure, record the error and return False."""
+                try:
+                    subprocess.run(conversion_args_list, check=True)
+                    produced_output_file_paths.append(produced_path_to_record)
+                    return True
+                except subprocess.CalledProcessError as subprocess_failure:
+                    conversion_subprocess_errors.append(
+                        f"Conversion failed for '{input_file_path}' -> '{produced_path_to_record}': "
+                        f"exit code {subprocess_failure.returncode}. See log above for details."
+                    )
+                    return False
+
             if 'rtf' in output_formats_for_entry:
                 rtf_output_path = base_path_without_extension + '.rtf'
                 print(f'Converting {input_file_path} -> {rtf_output_path}')
-                subprocess.run(
+                if run_converter_with_failure_tracking(
                     [sys.executable, converter_script_path, input_file_path, rtf_output_path],
-                    check=True,
-                )
-                subprocess.run(
-                    [sys.executable, rtf_image_embedder_script_path, rtf_output_path],
-                    check=True,
-                )
-                produced_output_file_paths.append(rtf_output_path)
+                    rtf_output_path,
+                ):
+                    # Embed images only when the base conversion succeeded.
+                    try:
+                        subprocess.run(
+                            [sys.executable, rtf_image_embedder_script_path, rtf_output_path],
+                            check=True,
+                        )
+                    except subprocess.CalledProcessError as embedder_failure:
+                        conversion_subprocess_errors.append(
+                            f"RTF image embedding failed for '{rtf_output_path}': "
+                            f"exit code {embedder_failure.returncode}."
+                        )
 
             if 'docx' in output_formats_for_entry:
                 docx_output_path = base_path_without_extension + '.docx'
                 print(f'Converting {input_file_path} -> {docx_output_path}')
-                subprocess.run(
+                run_converter_with_failure_tracking(
                     [sys.executable, converter_script_path, input_file_path, docx_output_path],
-                    check=True,
+                    docx_output_path,
                 )
-                produced_output_file_paths.append(docx_output_path)
 
             if 'txt' in output_formats_for_entry:
                 txt_output_path = base_path_without_extension + '.txt'
                 print(f'Converting {input_file_path} -> {txt_output_path}')
-                subprocess.run(
+                run_converter_with_failure_tracking(
                     [sys.executable, converter_script_path, input_file_path, txt_output_path],
-                    check=True,
+                    txt_output_path,
                 )
-                produced_output_file_paths.append(txt_output_path)
 
             if attach_this_entry_to_release:
                 if not active_release_tag:
@@ -91,16 +125,31 @@ runs:
                 else:
                     for produced_path in produced_output_file_paths:
                         print(f'::notice::Uploading {produced_path} to release {active_release_tag}')
-                        subprocess.run(
-                            ['gh', 'release', 'upload', active_release_tag, produced_path, '--clobber'],
-                            check=True,
-                        )
+                        try:
+                            subprocess.run(
+                                ['gh', 'release', 'upload', active_release_tag, produced_path, '--clobber'],
+                                check=True,
+                            )
+                        except subprocess.CalledProcessError as upload_failure:
+                            release_upload_errors.append(
+                                f"Failed to upload '{produced_path}' to release '{active_release_tag}': "
+                                f"exit code {upload_failure.returncode}."
+                            )
 
-        if missing_release_errors:
-            for error_message in missing_release_errors:
+        all_collected_errors = (
+            missing_input_file_errors
+            + conversion_subprocess_errors
+            + missing_release_errors
+            + release_upload_errors
+        )
+        if all_collected_errors:
+            print('::group::Conversion workflow error summary')
+            for error_message in all_collected_errors:
                 print(f'::error::{error_message}')
+            print('::endgroup::')
             print(
-                '::error::Release uploads skipped for the entries above. '
-                'Locally-committed outputs (commit_to_repo) have still been produced.'
+                '::error::Some files had errors (see grouped list above). '
+                'Files that converted successfully were still committed to the repo; '
+                'release assets that uploaded successfully are still present on the release.'
             )
             sys.exit(1)
