@@ -157,6 +157,58 @@ python3 gh-readme2rtf-docx-txt.py README.md README.docx
 python3 gh-readme2rtf-docx-txt.py README.md README.txt
 ```
 
+## Architecture at a Glance
+
+```
+README.md  ──▶  [ PARSER ]  ──▶  [ CONVERSION TABLE ]  ──▶  [ FORMAT POST-PASS ]  ──▶  output
+                 block + inline     GFM element ─┬─▶ rtf       one cleanup pass
+                 line by line                    ├─▶ docx      per file format
+                                                 └─▶ txt
+```
+
+### 1. Parsing — read it line by line
+
+The converter walks `README.md` top-to-bottom. Each line tries the **block handlers** in order (heading, fenced code, table, list, blockquote, footnote-def, paragraph…); first match wins. The matched block's text then flows through the **inline conversion table** for emphasis, links, emoji, `@mentions`, and so on.
+
+### 2. The conversion table — strategy pattern, expressed as data
+
+Instead of three parallel converters (`MarkdownToRtf`, `MarkdownToDocx`, `MarkdownToTxt`) with overridden methods, the codebase uses **one table** where each row is a GFM element and each column is a pure function that emits that element in one target format:
+
+```python
+INLINE_RULES = [
+    # (name,           (pattern,                    {'rtf': ...,       'docx': ...}))
+    ('bold_star',      (r'\*\*(.+?)\*\*',           {'rtf': r'{\b \1}',       'docx': docx_bold})),
+    ('md_link',        (r'\[([^\]]+)\]\(([^)]+)\)', {'rtf': rtf_link,         'docx': docx_link})),
+    ('emoji',          (r':\w+:',                   {'rtf': rtf_emoji,        'docx': docx_emoji})),
+    ('footnote_ref',   (r'\[\^([^\]]+)\]',          {'rtf': rtf_footnote_ref, 'docx': docx_footnote_ref})),
+    # ...
+]
+
+BLOCK_RULES = {
+    'rtf':  [block_heading, block_fenced_code, block_table, block_list, ...],
+    'docx': [docx_block_heading, docx_block_fenced_code, docx_block_table, ...],
+}
+```
+
+The dispatcher is four lines: **look up the active format in the row's dict, call the function (or substitute the string), move on**. That's the **strategy pattern implemented functionally** — each strategy is a small pure function (or an `re.sub` replacement string), chosen by dict key at runtime. No base class, no subclass hierarchy, no visitor.
+
+What this feels like when you edit the code:
+
+- **Add a markdown feature** → add one row. (This is how `<sub>`, `<sup>`, `<ins>`, and the emoji shortcode map were added.)
+- **Add a new output format** → add one key to every row. Dispatcher doesn't change.
+- **Tweak how bold renders in DOCX** → edit one cell. Other formats untouched.
+- Rules run in **phases** (HTML strip → escapes → links/images → inline code stash → GitHub refs → formatting), so later rows can assume earlier phases have already happened.
+
+### 3. Post-cleanup per doc type
+
+The conversion table handles *content*. Format-specific *plumbing* lives in a small post-pass so the core stays format-agnostic:
+
+| Format | Post-pass | Why |
+|---|---|---|
+| **RTF** | `rtf_image_embedder.py` swaps `[Image: ...]` markers for hex-encoded `\pict` blocks | Images get sized against page bounds only after layout is known |
+| **DOCX** | `<w:sectPr>` gets injected into the last paragraph's `<w:pPr>` | A body-level sectPr makes Word render a ghost trailing blank page |
+| **TXT** | `_txt_resolve_relative_links_only` rewrites relative links to full GitHub URLs | Plain text has nothing else to process |
+
 ## Viewing Tips
 
 When opening the RTF in LibreOffice Writer:
