@@ -6,6 +6,10 @@ inputs:
     description: 'Path to settings JSON file'
     required: false
     default: 'gh-readme2rtf-docx-txt-settings.json'
+  release_tag:
+    description: 'Release tag to attach generated files to (empty means no release is active)'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
@@ -14,43 +18,89 @@ runs:
       shell: bash
       run: pip install pygments pillow
 
-    - name: Convert README files
+    - name: Convert README files and process release attachments
       shell: python
       env:
         CONFIG_PATH: ${{ inputs.config }}
         ACTION_PATH: ${{ github.action_path }}
+        RELEASE_TAG: ${{ inputs.release_tag }}
+        GH_TOKEN: ${{ github.token }}
       run: |
         import json
         import os
         import subprocess
         import sys
 
-        config_path = os.environ['CONFIG_PATH']
-        action_path = os.environ['ACTION_PATH']
+        config_path_from_env = os.environ['CONFIG_PATH']
+        action_directory_from_env = os.environ['ACTION_PATH']
+        active_release_tag = os.environ.get('RELEASE_TAG', '').strip()
 
-        converter_script = os.path.join(action_path, 'gh-readme2rtf-docx-txt.py')
-        embedder_script = os.path.join(action_path, 'rtf_image_embedder.py')
+        converter_script_path = os.path.join(action_directory_from_env, 'gh-readme2rtf-docx-txt.py')
+        rtf_image_embedder_script_path = os.path.join(action_directory_from_env, 'rtf_image_embedder.py')
 
-        with open(config_path) as f:
-            config = json.load(f)
+        with open(config_path_from_env) as settings_file_handle:
+            settings_data = json.load(settings_file_handle)
 
-        for entry in config.get('files', []):
-            input_file = entry['input']
-            formats = entry.get('output_formats', ['rtf'])
-            base_name = input_file.rsplit('.', 1)[0]
+        missing_release_errors = []
 
-            if 'rtf' in formats:
-                rtf_path = base_name + '.rtf'
-                print(f'Converting {input_file} -> {rtf_path}')
-                subprocess.run([sys.executable, converter_script, input_file, rtf_path], check=True)
-                subprocess.run([sys.executable, embedder_script, rtf_path], check=True)
+        for file_entry in settings_data.get('files', []):
+            input_file_path = file_entry['input']
+            output_formats_for_entry = file_entry.get('output_formats', ['rtf'])
+            attach_this_entry_to_release = file_entry.get('attach_to_release', False)
+            base_path_without_extension = input_file_path.rsplit('.', 1)[0]
+            produced_output_file_paths = []
 
-            if 'docx' in formats:
-                docx_path = base_name + '.docx'
-                print(f'Converting {input_file} -> {docx_path}')
-                subprocess.run([sys.executable, converter_script, input_file, docx_path], check=True)
+            if 'rtf' in output_formats_for_entry:
+                rtf_output_path = base_path_without_extension + '.rtf'
+                print(f'Converting {input_file_path} -> {rtf_output_path}')
+                subprocess.run(
+                    [sys.executable, converter_script_path, input_file_path, rtf_output_path],
+                    check=True,
+                )
+                subprocess.run(
+                    [sys.executable, rtf_image_embedder_script_path, rtf_output_path],
+                    check=True,
+                )
+                produced_output_file_paths.append(rtf_output_path)
 
-            if 'txt' in formats:
-                txt_path = base_name + '.txt'
-                print(f'Converting {input_file} -> {txt_path}')
-                subprocess.run([sys.executable, converter_script, input_file, txt_path], check=True)
+            if 'docx' in output_formats_for_entry:
+                docx_output_path = base_path_without_extension + '.docx'
+                print(f'Converting {input_file_path} -> {docx_output_path}')
+                subprocess.run(
+                    [sys.executable, converter_script_path, input_file_path, docx_output_path],
+                    check=True,
+                )
+                produced_output_file_paths.append(docx_output_path)
+
+            if 'txt' in output_formats_for_entry:
+                txt_output_path = base_path_without_extension + '.txt'
+                print(f'Converting {input_file_path} -> {txt_output_path}')
+                subprocess.run(
+                    [sys.executable, converter_script_path, input_file_path, txt_output_path],
+                    check=True,
+                )
+                produced_output_file_paths.append(txt_output_path)
+
+            if attach_this_entry_to_release:
+                if not active_release_tag:
+                    missing_release_errors.append(
+                        f"attach_to_release=true for '{input_file_path}', but no release tag is active. "
+                        f"Create a release (or run this workflow from a 'release: published' event) "
+                        f"before expecting release asset uploads."
+                    )
+                else:
+                    for produced_path in produced_output_file_paths:
+                        print(f'::notice::Uploading {produced_path} to release {active_release_tag}')
+                        subprocess.run(
+                            ['gh', 'release', 'upload', active_release_tag, produced_path, '--clobber'],
+                            check=True,
+                        )
+
+        if missing_release_errors:
+            for error_message in missing_release_errors:
+                print(f'::error::{error_message}')
+            print(
+                '::error::Release uploads skipped for the entries above. '
+                'Locally-committed outputs (commit_to_repo) have still been produced.'
+            )
+            sys.exit(1)
