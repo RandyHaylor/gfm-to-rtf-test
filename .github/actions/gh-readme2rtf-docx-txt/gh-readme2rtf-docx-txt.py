@@ -240,10 +240,25 @@ def _handle_bare_url(match):
     url = match.group(0)
     return f'{{\\field{{{_RTF_STAR_PLACEHOLDER}\\fldinst HYPERLINK "{url}"}}{{\\fldrslt \\cf2 {url}}}}}'
 
+def _resolve_relative_url_if_needed(url):
+    """If `url` is a repo-relative link starting with ../, rewrite it to a full
+    GitHub blob URL. Absolute/anchor/mailto URLs are returned unchanged."""
+    if url.startswith(('http://', 'https://', '#', 'mailto:')):
+        return url
+    repo = _detect_github_repo()
+    if not repo:
+        return url
+    if url.startswith('../'):
+        tail = url[3:]
+        if not tail or tail.startswith('..'):
+            return url
+        return f'https://github.com/{repo}/blob/main/{tail}'
+    return url
+
 def _handle_md_link(match):
     """Convert [text](url) to RTF hyperlink field. Internal #anchors use \\l flag."""
     text = match.group(1)
-    url = match.group(2)
+    url = _resolve_relative_url_if_needed(match.group(2))
     if url.startswith('#'):
         bookmark = url[1:]  # strip the #
         return f'{{\\field{{{_RTF_STAR_PLACEHOLDER}\\fldinst HYPERLINK \\\\l "{bookmark}"}}{{\\fldrslt \\cf2 {text}}}}}'
@@ -343,7 +358,7 @@ def _docx_reset_image_marker_stash():
 def _docx_handle_md_link(match):
     """Convert [text](url) to DOCX field-code hyperlink. Mirrors RTF {\fldinst HYPERLINK}."""
     text = match.group(1)
-    url = match.group(2)
+    url = _resolve_relative_url_if_needed(match.group(2))
     text_placeholder = docx_stash_user_text(text)
     if url.startswith('#'):
         return _docx_field_hyperlink(url[1:], text_placeholder, is_anchor=True)
