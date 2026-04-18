@@ -64,7 +64,7 @@ README.md  \u9472?\u9472?\u9532?\u9472?\u9472?\u9654?  README.docx \u9472?\u9472
 Headings (h1–h6) with sized styles\cell
 \u9989?\cell
 \u9989?\cell
-\u9989?\cell
+—\cell
 \row}
 {\trowd
 \clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx2250
@@ -86,7 +86,7 @@ Headings (h1–h6) with sized styles\cell
 Clickable hyperlinks\cell
 \u9989?\cell
 \u9989?\cell
-\u9989?\cell
+—\cell
 \row}
 {\trowd
 \clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx2250
@@ -119,7 +119,7 @@ Relative link resolution to GitHub blob URLs\cell
 {\f1\fs20\chshdng1\chcbpat8 @mention} → GitHub profile links\cell
 \u9989?\cell
 \u9989?\cell
-—\cell
+\u9989?\cell
 \row}
 {\trowd
 \clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx2250
@@ -130,7 +130,7 @@ Relative link resolution to GitHub blob URLs\cell
 {\f1\fs20\chshdng1\chcbpat8 #issue} → GitHub issue links\cell
 \u9989?\cell
 \u9989?\cell
-—\cell
+\u9989?\cell
 \row}
 {\trowd
 \clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx2250
@@ -253,7 +253,7 @@ Horizontal rules\cell
 \u9989?\cell
 —\cell
 \row}
-{\pard\sb0\sa120\f0\fs22 TXT output is a link-resolved plain-text render \u8212? markdown structure preserved, link targets rewritten, no binary formatting.\par}
+{\pard\sb0\sa120\f0\fs22 TXT output is a link-resolved plain-text render \u8212? markdown structure preserved, with relative {\f1\fs20\chshdng1\chcbpat8 {\field{ RTFSTAR\fldinst HYPERLINK "path"}{\fldrslt \cf2 text}}} links, {\f1\fs20\chshdng1\chcbpat8 @mentions}, and {\f1\fs20\chshdng1\chcbpat8 #issue} refs all rewritten to full GitHub URLs. No binary formatting.\par}
 {\pard\sb280\sa120\keepn\f0\fs36\cf2\b {\*\bkmkstart quick-start}Quick Start{\*\bkmkend quick-start}\par}
 {\pard\sb240\sa120\keepn\f0\fs30\cf2\b {\*\bkmkstart 1-files-you-need-download-the-zip-from-releases-and-extract-at-your-repo-root}1. Files you need \u8212? download the zip from Releases and extract at your repo root{\*\bkmkend 1-files-you-need-download-the-zip-from-releases-and-extract-at-your-repo-root}\par}
 {\pard\sb0\sa120\f0\fs22 Grab the latest {\b {\f1\fs20\chshdng1\chcbpat8 gh-readme2rtf-docx-txt-install.zip}} from the {\field{\*\fldinst HYPERLINK "../../releases"}{\fldrslt \cf2 Releases}} page and unzip it at the root of your project. The zip mirrors the final install layout, so extraction drops everything into the correct place:\par}
@@ -485,8 +485,8 @@ A body-level sectPr makes Word render a ghost trailing blank page\cell
 \clbrdrb\brdrs\clbrdrl\brdrs\clbrdrr\brdrs\cellx9000
 \pard\intbl
 {\b TXT}\cell
-{\f1\fs20\chshdng1\chcbpat8 _txt_resolve_relative_links_only} rewrites relative links to full GitHub URLs\cell
-Plain text has nothing else to process\cell
+{\f1\fs20\chshdng1\chcbpat8 convert_markdown_to_txt} rewrites relative links, {\f1\fs20\chshdng1\chcbpat8 @mentions}, and {\f1\fs20\chshdng1\chcbpat8 #issue} refs to full GitHub URLs\cell
+Plain text carries URLs as markdown links ({\f1\fs20\chshdng1\chcbpat8 {\field{ RTFSTAR\fldinst HYPERLINK "url"}{\fldrslt \cf2 @name}}}) so tokens stay human-readable and tool-reprocessable\cell
 \row}
 {\pard\sb280\sa120\keepn\f0\fs36\cf2\b {\*\bkmkstart viewing-tips}Viewing Tips{\*\bkmkend viewing-tips}\par}
 {\pard\sb0\sa120\f0\fs22 When opening the RTF in LibreOffice Writer:\par}

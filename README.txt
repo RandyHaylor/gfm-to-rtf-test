@@ -27,13 +27,13 @@ This action auto-generates rich, formatted `.rtf`, `.docx`, and `.txt` files fro
 
 | Feature | RTF | DOCX | TXT |
 |---------|:---:|:---:|:---:|
-| Headings (h1–h6) with sized styles | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| Headings (h1–h6) with sized styles | :white_check_mark: | :white_check_mark: | — |
 | **Bold**, *italic*, ~~strikethrough~~, <ins>underline</ins>, <sub>sub</sub>, <sup>sup</sup> | :white_check_mark: | :white_check_mark: | — |
-| Clickable hyperlinks | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| Clickable hyperlinks | :white_check_mark: | :white_check_mark: | — |
 | Internal section-anchor links (bookmarks) | :white_check_mark: | :white_check_mark: | — |
 | Relative link resolution to GitHub blob URLs | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| `@mention` → GitHub profile links | :white_check_mark: | :white_check_mark: | — |
-| `#issue` → GitHub issue links | :white_check_mark: | :white_check_mark: | — |
+| `[@mention](https://github.com/mention)` → GitHub profile links | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| `#issue` → GitHub issue links | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 | Fenced code blocks with **syntax highlighting** | :white_check_mark: | :white_check_mark: | — |
 | Inline code with background shading | :white_check_mark: | :white_check_mark: | — |
 | Embedded images with auto-scaling | :white_check_mark: | :white_check_mark: | — |
@@ -46,7 +46,7 @@ This action auto-generates rich, formatted `.rtf`, `.docx`, and `.txt` files fro
 | Emoji shortcodes (`:rocket:` → 🚀) | :white_check_mark: | :white_check_mark: | — |
 | Horizontal rules | :white_check_mark: | :white_check_mark: | — |
 
-TXT output is a link-resolved plain-text render — markdown structure preserved, link targets rewritten, no binary formatting.
+TXT output is a link-resolved plain-text render — markdown structure preserved, with relative `[text](https://github.com/RandyHaylor/gh-readme2rtf-docx-txt/blob/main/path)` links, `[@mentions](https://github.com/mentions)`, and `#issue` refs all rewritten to full GitHub URLs. No binary formatting.
 
 ## Quick Start
 
@@ -128,7 +128,7 @@ on:
 jobs:
   convert:
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout[@v4](https://github.com/v4)
 
       - name: Sync workflow trigger paths to settings file
         # Reads the settings JSON, rewrites this file's `paths:` block if it
@@ -155,7 +155,7 @@ Converter source-code changes do **not** auto-trigger the workflow — run it ma
 
 Two Python files, zero heavy dependencies:
 
-1. **`gh-readme2rtf-docx-txt.py`** — Single converter driven by a data-driven rule engine. Parses GitHub-Flavored Markdown and emits RTF, DOCX, or TXT based on the output extension. Uses [Pygments](https://pygments.org/) for syntax highlighting across both RTF and DOCX. Resolves `@mentions`, `#issues`, and relative links to GitHub URLs automatically.
+1. **`gh-readme2rtf-docx-txt.py`** — Single converter driven by a data-driven rule engine. Parses GitHub-Flavored Markdown and emits RTF, DOCX, or TXT based on the output extension. Uses [Pygments](https://pygments.org/) for syntax highlighting across both RTF and DOCX. Resolves `[@mentions](https://github.com/mentions)`, `#issues`, and relative links to GitHub URLs automatically.
 
 2. **`rtf_image_embedder.py`** — Post-processor for the RTF path only. Finds `[Image: ...]` placeholders, reads referenced local images, downscales them with [Pillow](https://pillow.readthedocs.io/) to fit page bounds, and embeds them as hex-encoded `\pict` blocks. DOCX image embedding is handled inside the main converter using the OOXML package's native image relationships.
 
@@ -194,7 +194,7 @@ README.md  ──▶  [ PARSER ]  ──▶  [ CONVERSION TABLE ]  ──▶  [ 
 
 ### 1. Parsing — read it line by line
 
-The converter walks `README.md` top-to-bottom. Each line tries the **block handlers** in order (heading, fenced code, table, list, blockquote, footnote-def, paragraph…); first match wins. The matched block's text then flows through the **inline conversion table** for emphasis, links, emoji, `@mentions`, and so on.
+The converter walks `README.md` top-to-bottom. Each line tries the **block handlers** in order (heading, fenced code, table, list, blockquote, footnote-def, paragraph…); first match wins. The matched block's text then flows through the **inline conversion table** for emphasis, links, emoji, `[@mentions](https://github.com/mentions)`, and so on.
 
 ### 2. The conversion table — strategy pattern, expressed as data
 
@@ -233,7 +233,7 @@ The conversion table handles *content*. Format-specific *plumbing* lives in a sm
 |---|---|---|
 | **RTF** | `rtf_image_embedder.py` swaps `[Image: ...]` markers for hex-encoded `\pict` blocks | Images get sized against page bounds only after layout is known |
 | **DOCX** | `<w:sectPr>` gets injected into the last paragraph's `<w:pPr>` | A body-level sectPr makes Word render a ghost trailing blank page |
-| **TXT** | `_txt_resolve_relative_links_only` rewrites relative links to full GitHub URLs | Plain text has nothing else to process |
+| **TXT** | `convert_markdown_to_txt` rewrites relative links, `[@mentions](https://github.com/mentions)`, and `#issue` refs to full GitHub URLs | Plain text carries URLs as markdown links (`[[@name](https://github.com/name)](https://github.com/RandyHaylor/gh-readme2rtf-docx-txt/blob/main/url)`) so tokens stay human-readable and tool-reprocessable |
 
 ## Viewing Tips
 
@@ -283,7 +283,7 @@ Here is a relative link to [another file](https://github.com/RandyHaylor/gh-read
 
 Bare URL autolink: https://github.com
 
-GitHub references: @octocat and issue #42.
+GitHub references: [@octocat](https://github.com/octocat) and issue [#42](https://github.com/RandyHaylor/gh-readme2rtf-docx-txt/issues/42).
 
 ## Images
 
