@@ -1,12 +1,14 @@
-# :rocket: README to RTF — Auto-Convert GitHub READMEs to Rich Documents :tada:
+# :rocket: gh-readme2rtf-docx-txt — Auto-Convert GitHub READMEs to RTF, DOCX & TXT :tada:
 
-> **Your README.md, beautifully rendered as a shareable RTF file — automatically, on every push.**
+> **Your README.md, rendered as shareable RTF, DOCX, and TXT files — automatically, on every push.**
 
 ```
-README.md  ──▶  README.rtf  ──▶  Open anywhere. Share with anyone.
+             ┌──▶  README.rtf  ── Word / LibreOffice / WordPad / TextEdit
+README.md  ──┼──▶  README.docx ── Microsoft Word / Google Docs / Pages
+             └──▶  README.txt  ── Plain text, any editor
 ```
 
-:sparkles: **Embedded Images** | :art: **Syntax-Highlighted Code Blocks** | :link: **Clickable Links & Footnotes** | :warning: **GitHub Alerts** | :memo: **Full GFM Support** | :rocket: **Emoji That Actually Render**
+:sparkles: **Embedded Images** | :art: **Syntax-Highlighted Code (RTF + DOCX)** | :link: **Clickable Links & Footnotes** | :warning: **GitHub Alerts** | :memo: **Full GFM Support** | :rocket: **Emoji That Actually Render**
 
 ---
 
@@ -19,45 +21,67 @@ GitHub READMEs look great *on GitHub*. But what about:
 - :airplane: **Reading offline** without a browser?
 - :printer: **Printing** with proper formatting?
 
-This project auto-generates a **rich, formatted RTF file** from your `README.md` every time you push. The RTF opens in LibreOffice, Word, WordPad, TextEdit — any word processor on any OS.
+This action auto-generates rich, formatted `.rtf`, `.docx`, and `.txt` files from your `README.md` every time you push. The outputs open in any word processor on any OS — Word, LibreOffice, Google Docs, Pages, WordPad, TextEdit — no browser required.
 
 ## What You Get
 
-| Feature | Status |
-|---------|--------|
-| Headings (h1-h6) with sizes | :white_check_mark: |
-| **Bold**, *italic*, ~~strikethrough~~ | :white_check_mark: |
-| Clickable hyperlinks | :white_check_mark: |
-| Internal document links (section anchors) | :white_check_mark: |
-| `@mention` links to GitHub profiles | :white_check_mark: |
-| `#issue` links to repo issues | :white_check_mark: |
-| Fenced code blocks with **syntax highlighting** | :white_check_mark: |
-| Inline code with background shading | :white_check_mark: |
-| Embedded images with auto-scaling | :white_check_mark: |
-| Oversized image clamping to page bounds | :white_check_mark: |
-| Tables with borders | :white_check_mark: |
-| Ordered, unordered, and task lists | :white_check_mark: |
-| GitHub alerts (Note, Tip, Important, Warning, Caution) | :white_check_mark: |
-| Blockquotes | :white_check_mark: |
-| Footnotes with clickable references | :white_check_mark: |
-| Emoji via surrogate pairs | :white_check_mark: |
-| Horizontal rules | :white_check_mark: |
+| Feature | RTF | DOCX | TXT |
+|---------|:---:|:---:|:---:|
+| Headings (h1–h6) with sized styles | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| **Bold**, *italic*, ~~strikethrough~~, <ins>underline</ins>, <sub>sub</sub>, <sup>sup</sup> | :white_check_mark: | :white_check_mark: | — |
+| Clickable hyperlinks | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| Internal section-anchor links (bookmarks) | :white_check_mark: | :white_check_mark: | — |
+| Relative link resolution to GitHub blob URLs | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| `@mention` → GitHub profile links | :white_check_mark: | :white_check_mark: | — |
+| `#issue` → GitHub issue links | :white_check_mark: | :white_check_mark: | — |
+| Fenced code blocks with **syntax highlighting** | :white_check_mark: | :white_check_mark: | — |
+| Inline code with background shading | :white_check_mark: | :white_check_mark: | — |
+| Embedded images with auto-scaling | :white_check_mark: | :white_check_mark: | — |
+| Oversized image clamping to page bounds | :white_check_mark: | :white_check_mark: | — |
+| Tables with borders + column alignment | :white_check_mark: | :white_check_mark: | — |
+| Ordered, unordered, and task lists | :white_check_mark: | :white_check_mark: | — |
+| GitHub alerts (Note, Tip, Important, Warning, Caution) | :white_check_mark: | :white_check_mark: | — |
+| Blockquotes (including nested) | :white_check_mark: | :white_check_mark: | — |
+| Footnotes with clickable references | :white_check_mark: | :white_check_mark: | — |
+| Emoji shortcodes (`:rocket:` → 🚀) | :white_check_mark: | :white_check_mark: | — |
+| Horizontal rules | :white_check_mark: | :white_check_mark: | — |
+
+TXT output is a link-resolved plain-text render — markdown structure preserved, link targets rewritten, no binary formatting.
 
 ## Quick Start
 
 ### 1. Copy the action into your repo
 
 ```bash
-mkdir -p .github/actions/readme-to-rtf
-cp action.yml gfm_markdown_to_rtf.py rtf_image_embedder.py .github/actions/readme-to-rtf/
+mkdir -p .github/actions/gh-readme2rtf-docx-txt
+cp action.yml gh-readme2rtf-docx-txt.py rtf_image_embedder.py \
+   .github/actions/gh-readme2rtf-docx-txt/
+cp gh-readme2rtf-docx-txt-settings.json .
 ```
 
-### 2. Add the workflow
+### 2. Configure which files and formats to generate
 
-Create `.github/workflows/readme-to-rtf.yml`:
+Edit `gh-readme2rtf-docx-txt-settings.json` at the repo root:
+
+```json
+{
+  "files": [
+    {
+      "input": "README.md",
+      "output_formats": ["rtf", "docx", "txt"]
+    }
+  ]
+}
+```
+
+Each entry picks any combination of `rtf`, `docx`, `txt`. Multiple `files` entries are supported — e.g. a top-level README plus submodule READMEs.
+
+### 3. Add the workflow
+
+Create `.github/workflows/gh-readme2rtf-docx-txt.yml`:
 
 ```yaml
-name: Convert README to RTF
+name: Convert README to RTF/DOCX/TXT
 
 on:
   workflow_dispatch:
@@ -73,8 +97,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Convert README to RTF
-        uses: ./.github/actions/readme-to-rtf
+      - name: Convert README
+        uses: ./.github/actions/gh-readme2rtf-docx-txt
 
       - name: Configure git
         shell: bash
@@ -84,30 +108,32 @@ jobs:
         shell: bash
         run: git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Stage RTF
+      - name: Stage generated files
         shell: bash
-        run: git add README.rtf
+        run: git add *.rtf *.docx *.txt 2>/dev/null || true
 
       - name: Commit if changed
         shell: bash
-        run: 'git diff --cached --quiet || git commit -m "auto-regenerate README.rtf from README.md"'
+        run: 'git diff --cached --quiet || git commit -m "auto-regenerate README documents"'
 
       - name: Push
         shell: bash
         run: git push
 ```
 
-### 3. Push and done
+### 4. Push and done
 
-Every time `README.md` changes, the workflow generates a fresh `README.rtf` and commits it to your repo. You can also trigger it manually from the Actions tab.
+Every time `README.md` changes, the workflow regenerates the configured outputs and commits them back. You can also trigger it manually from the Actions tab.
 
 ## How It Works
 
-Two Python scripts, zero heavy dependencies:
+Two Python files, zero heavy dependencies:
 
-1. **`gfm_markdown_to_rtf.py`** — Parses GitHub-Flavored Markdown and generates RTF with a data-driven rule engine. Uses [Pygments](https://pygments.org/) for syntax highlighting. Resolves `@mentions` and `#issues` to GitHub URLs automatically.
+1. **`gh-readme2rtf-docx-txt.py`** — Single converter driven by a data-driven rule engine. Parses GitHub-Flavored Markdown and emits RTF, DOCX, or TXT based on the output extension. Uses [Pygments](https://pygments.org/) for syntax highlighting across both RTF and DOCX. Resolves `@mentions`, `#issues`, and relative links to GitHub URLs automatically.
 
-2. **`rtf_image_embedder.py`** — Standalone module that finds `[Image: ...]` placeholders in RTF, reads the referenced local images, downscales them to fit page bounds using [Pillow](https://pillow.readthedocs.io/), and embeds them as hex-encoded `\pict` blocks.
+2. **`rtf_image_embedder.py`** — Post-processor for the RTF path only. Finds `[Image: ...]` placeholders, reads referenced local images, downscales them with [Pillow](https://pillow.readthedocs.io/) to fit page bounds, and embeds them as hex-encoded `\pict` blocks. DOCX image embedding is handled inside the main converter using the OOXML package's native image relationships.
+
+The composite action (`action.yml`) reads `gh-readme2rtf-docx-txt-settings.json` and dispatches the converter per file/format.
 
 ### Dependencies
 
@@ -119,8 +145,16 @@ Two Python scripts, zero heavy dependencies:
 
 ```bash
 pip install pygments pillow
-python3 gfm_markdown_to_rtf.py README.md README.rtf
+
+# RTF (two steps: convert, then embed images)
+python3 gh-readme2rtf-docx-txt.py README.md README.rtf
 python3 rtf_image_embedder.py README.rtf
+
+# DOCX (single step — images embedded inline)
+python3 gh-readme2rtf-docx-txt.py README.md README.docx
+
+# TXT (link-resolved plain text)
+python3 gh-readme2rtf-docx-txt.py README.md README.txt
 ```
 
 ## Viewing Tips
@@ -131,11 +165,13 @@ When opening the RTF in LibreOffice Writer:
 - **Read-only mode**: Edit > Edit Mode (toggle off) for a clean reading view
 - **Full screen**: `Ctrl+Shift+J`
 
+The DOCX opens natively in Microsoft Word, Google Docs, and Pages — no squiggle toggling needed.
+
 ---
 
 # :test_tube: Test Content
 
-> Everything below exercises every GitHub-Flavored Markdown element supported by the converter. The generated `README.rtf` in this repo is living proof it all works — open it and compare!
+> Everything below exercises every GitHub-Flavored Markdown element supported by the converter. The generated `README.rtf`, `README.docx`, and `README.txt` in this repo are living proof it all works — open any of them and compare!
 
 ## Heading Level 2
 
