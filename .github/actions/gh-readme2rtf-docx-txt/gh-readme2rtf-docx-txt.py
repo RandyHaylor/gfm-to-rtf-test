@@ -998,13 +998,12 @@ def docx_block_heading(lines, index):
         raw_text = heading_match.group(2)
         bookmark_id = _heading_to_bookmark_id(raw_text)
         bid = hash(bookmark_id) % 10000
-        # Route heading text through the stash rather than inline escaping.
-        # bookmark_id is already slug-safe (ASCII word chars + hyphen), no stash needed.
-        heading_text_placeholder = docx_stash_user_text(raw_text)
+        formatted_heading_inline = apply_inline_rules(raw_text, fmt='docx')
+        wrapped_heading_runs = _docx_wrap_plain_text_in_runs(formatted_heading_inline)
         xml = (f'<w:p><w:pPr><w:pStyle w:val="Heading{level}"/></w:pPr>'
                f'<w:bookmarkStart w:id="{bid}" w:name="{bookmark_id}"/>'
                f'<w:bookmarkEnd w:id="{bid}"/>'
-               f'<w:r><w:t xml:space="preserve">{heading_text_placeholder}</w:t></w:r></w:p>')
+               f'{wrapped_heading_runs}</w:p>')
         return (xml, 1)
     return None
 
