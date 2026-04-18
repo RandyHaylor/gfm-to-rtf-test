@@ -27,13 +27,13 @@ This action auto-generates rich, formatted `.rtf`, `.docx`, and `.txt` files fro
 
 | Feature | RTF | DOCX | TXT |
 |---------|:---:|:---:|:---:|
-| Headings (h1–h6) with sized styles | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| Headings (h1–h6) with sized styles | :white_check_mark: | :white_check_mark: | — |
 | **Bold**, *italic*, ~~strikethrough~~, <ins>underline</ins>, <sub>sub</sub>, <sup>sup</sup> | :white_check_mark: | :white_check_mark: | — |
-| Clickable hyperlinks | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| Clickable hyperlinks | :white_check_mark: | :white_check_mark: | — |
 | Internal section-anchor links (bookmarks) | :white_check_mark: | :white_check_mark: | — |
 | Relative link resolution to GitHub blob URLs | :white_check_mark: | :white_check_mark: | :white_check_mark: |
-| `@mention` → GitHub profile links | :white_check_mark: | :white_check_mark: | — |
-| `#issue` → GitHub issue links | :white_check_mark: | :white_check_mark: | — |
+| `@mention` → GitHub profile links | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| `#issue` → GitHub issue links | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 | Fenced code blocks with **syntax highlighting** | :white_check_mark: | :white_check_mark: | — |
 | Inline code with background shading | :white_check_mark: | :white_check_mark: | — |
 | Embedded images with auto-scaling | :white_check_mark: | :white_check_mark: | — |
@@ -46,7 +46,7 @@ This action auto-generates rich, formatted `.rtf`, `.docx`, and `.txt` files fro
 | Emoji shortcodes (`:rocket:` → 🚀) | :white_check_mark: | :white_check_mark: | — |
 | Horizontal rules | :white_check_mark: | :white_check_mark: | — |
 
-TXT output is a link-resolved plain-text render — markdown structure preserved, link targets rewritten, no binary formatting.
+TXT output is a link-resolved plain-text render — markdown structure preserved, with relative `[text](path)` links, `@mentions`, and `#issue` refs all rewritten to full GitHub URLs. No binary formatting.
 
 ## Quick Start
 
@@ -233,7 +233,7 @@ The conversion table handles *content*. Format-specific *plumbing* lives in a sm
 |---|---|---|
 | **RTF** | `rtf_image_embedder.py` swaps `[Image: ...]` markers for hex-encoded `\pict` blocks | Images get sized against page bounds only after layout is known |
 | **DOCX** | `<w:sectPr>` gets injected into the last paragraph's `<w:pPr>` | A body-level sectPr makes Word render a ghost trailing blank page |
-| **TXT** | `_txt_resolve_relative_links_only` rewrites relative links to full GitHub URLs | Plain text has nothing else to process |
+| **TXT** | `convert_markdown_to_txt` rewrites relative links, `@mentions`, and `#issue` refs to full GitHub URLs | Plain text carries URLs as markdown links (`[@name](url)`) so tokens stay human-readable and tool-reprocessable |
 
 ## Viewing Tips
 

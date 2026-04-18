@@ -1939,9 +1939,43 @@ def _txt_resolve_relative_links_only(markdown_text, input_file_path=None):
     return re.sub(r'\[([^\]]+)\]\(([^)]+)\)', _resolve_one_link, markdown_text)
 
 
+def _txt_resolve_mention_and_issue_references_to_markdown_links(markdown_text):
+    """Rewrite bare @mentions and #issue refs into markdown-link form so the TXT
+    output carries real URLs alongside the tokens. Matches the same regex the
+    RTF/DOCX pipelines use so TXT stays consistent with the other formats.
+    No-op when the GitHub repo slug can't be detected."""
+    repo_slug = _detect_github_repo()
+    if not repo_slug:
+        return markdown_text
+
+    def _expand_single_mention(match):
+        mention_handle = match.group(1)
+        full_profile_url = f'https://github.com/{mention_handle}'
+        return f'[@{mention_handle}]({full_profile_url})'
+
+    def _expand_single_issue_reference(match):
+        issue_number = match.group(1)
+        full_issue_url = f'https://github.com/{repo_slug}/issues/{issue_number}'
+        return f'[#{issue_number}]({full_issue_url})'
+
+    mention_pattern_matching_rtf_docx_rules = r'@(\w[\w/-]*)'
+    issue_reference_pattern_matching_rtf_docx_rules = r'(?<![&A-Fa-f0-9])#(\d+)\b'
+
+    markdown_text = re.sub(mention_pattern_matching_rtf_docx_rules, _expand_single_mention, markdown_text)
+    markdown_text = re.sub(issue_reference_pattern_matching_rtf_docx_rules, _expand_single_issue_reference, markdown_text)
+    return markdown_text
+
+
 def convert_markdown_to_txt(markdown_text, input_file_path=None):
-    """Return markdown verbatim with only relative URLs in [text](url) links resolved."""
-    return _txt_resolve_relative_links_only(markdown_text, input_file_path)
+    """Produce the TXT rendering: markdown structure preserved, with three
+    link-resolution passes so the text carries real URLs instead of bare tokens:
+      1. Relative `[text](path)` links -> full GitHub blob URLs.
+      2. `@mentions` -> `[@mention](https://github.com/mention)` markdown links.
+      3. `#<issue>` refs -> `[#N](https://github.com/<repo>/issues/N)` markdown links.
+    """
+    link_resolved = _txt_resolve_relative_links_only(markdown_text, input_file_path)
+    mention_and_issue_resolved = _txt_resolve_mention_and_issue_references_to_markdown_links(link_resolved)
+    return mention_and_issue_resolved
 
 # ---------------------------------------------------------------------------
 # CLI ENTRY POINT
